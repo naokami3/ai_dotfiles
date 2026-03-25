@@ -1,6 +1,10 @@
 ---
 name: write-project-docs
-description: プロジェクトドキュメント（architecture.md, roadmap.md, security-design.md 等）を作成・更新する際の基準。
+description: >
+  プロジェクトドキュメント（architecture.md, roadmap.md, security-design.md 等）を作成・更新する際の基準。
+  TRIGGER when: docs/ 配下の architecture.md、roadmap.md、security-design.md 等の
+  プロジェクトドキュメントを新規作成・更新する際に自動実行する。
+  DO NOT TRIGGER when: ADR（write-adr を使用）、CLAUDE.md（write-claude-md を使用）、コードのみの変更。
 ---
 
 # プロジェクトドキュメント作成ガイド

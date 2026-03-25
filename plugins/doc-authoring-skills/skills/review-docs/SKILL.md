@@ -1,6 +1,10 @@
 ---
 name: review-docs
-description: Independent document reviewer. Evaluates from a perspective separate from the author, providing concrete improvement instructions.
+description: >
+  Independent document reviewer. Evaluates from a perspective separate from the author, providing concrete improvement instructions.
+  TRIGGER when: .md files under docs/, CLAUDE.md, README.md, CONTRIBUTING.md,
+  or ADRs are created or updated — auto-run as a pre-commit review.
+  DO NOT TRIGGER when: code-only changes, or user explicitly opts out of review.
 ---
 
 # Document Review Skill

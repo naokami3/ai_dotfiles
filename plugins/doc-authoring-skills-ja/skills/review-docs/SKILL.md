@@ -1,6 +1,10 @@
 ---
 name: review-docs
-description: ドキュメントの独立レビュアー。生成者とは別の視点で評価し、具体的な改善指示を出す。
+description: >
+  ドキュメントの独立レビュアー。生成者とは別の視点で評価し、具体的な改善指示を出す。
+  TRIGGER when: docs/ 配下の .md ファイル、CLAUDE.md、README.md、CONTRIBUTING.md、
+  または ADR を作成・更新した後、コミット前のレビューとして自動実行する。
+  DO NOT TRIGGER when: コードのみの変更、ユーザーが明示的にレビュー不要と指示した場合。
 ---
 
 # ドキュメントレビュースキル

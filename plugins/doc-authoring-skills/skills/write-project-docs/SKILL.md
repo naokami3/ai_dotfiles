@@ -1,6 +1,10 @@
 ---
 name: write-project-docs
-description: Standards for creating and updating project documentation (architecture.md, roadmap.md, security-design.md, etc.).
+description: >
+  Standards for creating and updating project documentation (architecture.md, roadmap.md, security-design.md, etc.).
+  TRIGGER when: creating or updating project docs under docs/ such as architecture.md,
+  roadmap.md, security-design.md, etc.
+  DO NOT TRIGGER when: ADRs (use write-adr), CLAUDE.md (use write-claude-md), code-only changes.
 ---
 
 # Project Documentation Guide

@@ -1,6 +1,10 @@
 ---
 name: write-adr
-description: ADR (Architecture Decision Record) を作成する。技術的な意思決定を行った際に使用。
+description: >
+  ADR (Architecture Decision Record) を作成する。技術的な意思決定を行った際に使用。
+  TRIGGER when: 技術選定・設計判断を行った際（ライブラリ選定、アーキテクチャ変更、
+  プロトコル決定、既存方針の撤回など）に自動実行する。
+  DO NOT TRIGGER when: 既存 ADR の軽微な誤字修正、コードのみの変更。
 ---
 
 # ADR 作成ガイド

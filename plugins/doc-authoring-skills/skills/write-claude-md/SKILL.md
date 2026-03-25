@@ -1,6 +1,10 @@
 ---
 name: write-claude-md
-description: Create or update CLAUDE.md following Anthropic's recommended structure. Use at project start or when adding rules.
+description: >
+  Create or update CLAUDE.md following Anthropic's recommended structure. Use at project start or when adding rules.
+  TRIGGER when: creating or updating CLAUDE.md, or adding new entries to sections
+  like rules, pitfalls, or commands.
+  DO NOT TRIGGER when: changes to files other than CLAUDE.md, code-only changes.
 ---
 
 # CLAUDE.md Authoring Guide

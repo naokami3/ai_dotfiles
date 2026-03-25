@@ -1,6 +1,10 @@
 ---
 name: write-adr
-description: Create Architecture Decision Records (ADRs) to document technical decisions with context, alternatives, and consequences.
+description: >
+  Create Architecture Decision Records (ADRs) to document technical decisions with context, alternatives, and consequences.
+  TRIGGER when: a technical decision is made (library selection, architecture change,
+  protocol decision, reversal of existing policy, etc.).
+  DO NOT TRIGGER when: minor typo fixes in existing ADRs, code-only changes.
 ---
 
 # ADR Authoring Guide

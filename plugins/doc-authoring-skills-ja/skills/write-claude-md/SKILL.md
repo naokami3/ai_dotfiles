@@ -1,6 +1,10 @@
 ---
 name: write-claude-md
-description: CLAUDE.md を Anthropic 推奨構成で作成・更新する。プロジェクト開始時やルール追加時に使用。
+description: >
+  CLAUDE.md を Anthropic 推奨構成で作成・更新する。プロジェクト開始時やルール追加時に使用。
+  TRIGGER when: CLAUDE.md を新規作成・更新する際、または「絶対に守るルール」「既知の落とし穴」
+  「コマンド」等のセクションに新しいエントリを追加する際に自動実行する。
+  DO NOT TRIGGER when: CLAUDE.md 以外のファイル変更、コードのみの変更。
 ---
 
 # CLAUDE.md 作成・更新ガイド
