@@ -1,0 +1,10 @@
+{
+  "name": "doc-authoring-skills",
+  "version": "1.0.0",
+  "description": "Skills for authoring and reviewing technical documents: ADRs, CLAUDE.md, project docs, and independent document review with structured evaluation.",
+  "author": {
+    "name": "naokami3"
+  },
+  "license": "MIT",
+  "keywords": ["docs", "adr", "claude-md", "review", "documentation", "technical-writing"]
+}

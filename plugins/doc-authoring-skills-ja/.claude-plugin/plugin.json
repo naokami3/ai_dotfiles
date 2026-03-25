@@ -1,0 +1,10 @@
+{
+  "name": "doc-authoring-skills-ja",
+  "version": "1.0.0",
+  "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、CLAUDE.md、プロジェクトドキュメント、独立評価によるドキュメントレビュー。",
+  "author": {
+    "name": "naokami3"
+  },
+  "license": "MIT",
+  "keywords": ["docs", "adr", "claude-md", "review", "documentation", "technical-writing", "japanese"]
+}
