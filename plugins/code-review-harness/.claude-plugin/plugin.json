@@ -1,0 +1,10 @@
+{
+  "name": "code-review-harness",
+  "version": "1.0.0",
+  "description": "Code review skill using the Generator-Evaluator harness pattern. An independent Evaluator that actually runs the code to find bugs that code-reading alone misses.",
+  "author": {
+    "name": "naokami3"
+  },
+  "license": "MIT",
+  "keywords": ["code-review", "harness", "evaluator", "security", "testing", "quality"]
+}
