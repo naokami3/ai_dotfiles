@@ -15,10 +15,14 @@ will say "HTTP 200 returned — User B modified User A's data" when it actually 
 | Skill | Description |
 |-------|-------------|
 | `harness-review` | Independent Evaluator — discovers the project environment from scratch, runs the code, and reports only confirmed findings |
+| `harness-review-ja` | 同上の日本語版 |
 
 ## Usage
 ```bash
 /code-review-harness:harness-review
+
+# 日本語版
+/code-review-harness:harness-review-ja
 ```
 
 ⚠️ **Must be run in a fresh Claude Code session.**
