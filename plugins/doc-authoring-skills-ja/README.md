@@ -30,6 +30,8 @@ claude --plugin-dir ./plugins/doc-authoring-skills-ja
 
 ```
 /doc-authoring-skills-ja:write-adr
+/doc-authoring-skills-ja:write-claude-md
+/doc-authoring-skills-ja:write-project-docs
 /doc-authoring-skills-ja:review-docs
 ```
 
