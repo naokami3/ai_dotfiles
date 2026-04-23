@@ -1,0 +1,10 @@
+{
+  "name": "ai-slop-review-ja",
+  "version": "1.0.0",
+  "description": "日本語文章からAI生成特有のパターン（AI臭・スロップ）を検出し、自然な日本語に直すための構造化レビューを出力するスキル集。",
+  "author": {
+    "name": "naokami3"
+  },
+  "license": "MIT",
+  "keywords": ["ai-slop", "review", "japanese", "writing", "technical-writing", "content-review"]
+}
