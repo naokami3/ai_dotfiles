@@ -19,7 +19,8 @@ Inspired by the Generator-Evaluator pattern from [Anthropic's harness design res
 
 ```bash
 # From GitHub marketplace
-/plugin marketplace add naokami3/ai-dotfiles
+/plugin marketplace add naokami3/ai_dotfiles
+/plugin install doc-authoring-skills@ai-dotfiles
 
 # Or test locally
 claude --plugin-dir ./plugins/doc-authoring-skills

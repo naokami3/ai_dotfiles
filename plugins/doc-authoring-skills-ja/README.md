@@ -19,7 +19,8 @@
 
 ```bash
 # GitHub マーケットプレイスから
-/plugin marketplace add naokami3/ai-dotfiles
+/plugin marketplace add naokami3/ai_dotfiles
+/plugin install doc-authoring-skills-ja@ai-dotfiles
 
 # ローカルテスト
 claude --plugin-dir ./plugins/doc-authoring-skills-ja

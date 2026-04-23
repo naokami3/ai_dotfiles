@@ -1,0 +1,38 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-dotfiles",
+  "description": "naokami3 の Claude Code プラグイン集。コードレビュー、ドキュメント作成、AI臭レビューなど。",
+  "owner": {
+    "name": "naokami3"
+  },
+  "plugins": [
+    {
+      "name": "ai-slop-review-ja",
+      "description": "日本語文章からAI生成特有のパターン（AI臭・スロップ）を検出し、自然な日本語に直すための構造化レビューを出力する。",
+      "category": "writing",
+      "source": "./plugins/ai-slop-review-ja",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/ai-slop-review-ja"
+    },
+    {
+      "name": "code-review-harness",
+      "description": "生成者-評価者ハーネスパターンによるコードレビュー。コードを実際に実行して確認済みの不具合のみを報告する独立Evaluator。",
+      "category": "development",
+      "source": "./plugins/code-review-harness",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/code-review-harness"
+    },
+    {
+      "name": "doc-authoring-skills",
+      "description": "Technical documentation authoring and review skills: ADR, CLAUDE.md, project docs, independent documentation review.",
+      "category": "documentation",
+      "source": "./plugins/doc-authoring-skills",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/doc-authoring-skills"
+    },
+    {
+      "name": "doc-authoring-skills-ja",
+      "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、CLAUDE.md、プロジェクトドキュメント、独立評価によるドキュメントレビュー。",
+      "category": "documentation",
+      "source": "./plugins/doc-authoring-skills-ja",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/doc-authoring-skills-ja"
+    }
+  ]
+}

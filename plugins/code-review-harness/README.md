@@ -53,7 +53,8 @@ Docker, Rails, npm, or any specific framework.
 ## Install
 ```bash
 # From GitHub
-/plugin marketplace add naokami3/ai-dotfiles
+/plugin marketplace add naokami3/ai_dotfiles
+/plugin install code-review-harness@ai-dotfiles
 
 # Local test
 claude --plugin-dir ./plugins/code-review-harness
