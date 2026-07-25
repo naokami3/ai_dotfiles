@@ -11,6 +11,15 @@ description: >
 
 Record technical decisions in `docs/adr/NNNN-<slug>.md`.
 
+## Related Skills
+
+| Target | Skill |
+|---|---|
+| Technical decision records | `write-adr` (this skill) |
+| AGENTS.md / CLAUDE.md | `write-agent-instructions` |
+| architecture.md / roadmap.md and other docs/ content | `write-project-docs` |
+| Verification after authoring | `review-docs` |
+
 ## Purpose of ADRs
 
 ADRs serve two purposes:
@@ -26,6 +35,16 @@ ADRs serve two purposes:
 - When deciding on API design or testing strategy
 - When making linter/formatter policy or license compatibility decisions
 - When a future developer would ask "why was this done this way?"
+
+## The Decision Belongs to a Human
+
+An ADR records a decision a human made. It is not an agent's proposal document. Follow three rules:
+
+1. **Do not decide Decision or Confidence on their behalf.** If you cannot establish them from the conversation, the diff, or the code, ask the user before writing the ADR. "Either seemed fine so I picked A" fabricates the record
+2. **Never put unmeasured values in Evaluation.** Benchmarks, bundle sizes, and memory figures go in only if you actually measured them or read them from a source, with that source cited. If you did not measure, write "not measured"
+3. **Do not list options you did not evaluate.** Include only alternatives you actually investigated. Never pad the candidate list for appearance
+
+Leaving a field blank is preferable to filling it with a plausible-looking value.
 
 ## Format
 
@@ -58,7 +77,7 @@ Why this decision was needed. Describe the problem and background.
 ## Evaluation (if empirical data exists)
 
 Results from actual testing. Code examples, benchmarks, quality comparisons.
-Show that the decision is data-driven.
+Cite the source of every number (measurement method, date, or reference).
 
 ## Consequences
 
@@ -77,7 +96,7 @@ This decision should be revisited if:
 
 - **Inverted pyramid**: Lead with the conclusion. The decision should be clear without reading the details
 - **Record the rationale**: Not just "X was rejected" but "X was tested and rejected because of Y"
-- **Include empirical data**: Whenever possible, record benchmarks, quality comparisons, memory usage measurements
+- **Include empirical data**: Whenever possible record benchmarks, quality comparisons, and memory measurements, with their sources
 - **Document rejected options**: Prevents re-investigation when the same option is proposed later
 - **State confidence explicitly**: Use the Confidence field to indicate whether this was a firm decision or a tentative one
 - **Define re-evaluation triggers**: Specify what context changes would warrant revisiting this decision
@@ -94,10 +113,18 @@ This decision should be revisited if:
 
 ## How to Create
 
-1. Ensure the `docs/adr/` directory exists (create if missing)
-2. Find the highest existing number and increment by 1 (zero-padded to 4 digits: 0001, 0002, ...)
+1. **Establish Decision, Confidence, and Decision makers.** Ask the user if the conversation does not settle them
+2. **Assign the number.** Run the bundled `scripts/next-adr-number.sh`. It creates the directory and returns `0001` if none exists
+
+   ```bash
+   scripts/next-adr-number.sh              # next number for docs/adr
+   scripts/next-adr-number.sh path/to/adr  # for a different directory
+   ```
+
+   Where the script cannot run, read the highest 4-digit prefix among existing files in `docs/adr/`, increment it, and zero-pad to 4 digits
 3. Create `docs/adr/NNNN-<slug>.md` and fill in the template above
-4. Initialize Status as `Proposed`
+4. Initialize Status as `Proposed` (use `Accepted` only when the user states the decision is already agreed)
+5. **Verify with the `review-docs` criteria.** Fix any must-fix findings before reporting completion
 
 ## Example
 
@@ -115,22 +142,34 @@ This decision should be revisited if:
 
 ## Context
 
-Frontend bundle size reduction was required, prompting a review of dependencies. axios is feature-rich but large (29kB min+gzip), and the project only uses basic GET/POST requests.
+Frontend bundle size reduction was required, prompting a review of dependencies. axios is feature-rich but large, and the project only uses basic GET/POST requests.
 
 ## Candidates
 
 ### A. ky
-- Fetch-based wrapper. 2.5kB min+gzip. Built-in retry and timeout
+- Fetch-based wrapper. Built-in retry and timeout
 
 ### B. ofetch
-- 3.1kB. From the Nuxt ecosystem. Capable but smaller community
+- From the Nuxt ecosystem. Capable but smaller community
 
 ### C. Native fetch
 - No additional dependency. But retry and timeout must be implemented manually
 
+## Evaluation
+
+min+gzip sizes measured after `npm run build` (2026-03-15, Vite 5, production build):
+
+| Library | Size |
+|---|---|
+| axios | 29.1 kB |
+| ky | 2.5 kB |
+| ofetch | 3.1 kB |
+
+Native fetch not measured (0 kB of dependency, but the hand-rolled retry/timeout code was not sized).
+
 ## Consequences
 
-- Bundle size reduced by ~27kB
+- Bundle size reduced by ~27 kB
 - axios-specific features (interceptors) must be replaced with ky hooks
 - Existing API client layer requires rewriting
 

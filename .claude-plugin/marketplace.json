@@ -29,14 +29,14 @@
     },
     {
       "name": "doc-authoring-skills",
-      "description": "Technical documentation authoring and review skills: ADR, CLAUDE.md, project docs, independent documentation review.",
+      "description": "Technical documentation authoring and review skills: ADR, agent instruction files (AGENTS.md / CLAUDE.md), project docs, and document review driven by verified findings.",
       "category": "documentation",
       "source": "./plugins/doc-authoring-skills",
       "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/doc-authoring-skills"
     },
     {
       "name": "doc-authoring-skills-ja",
-      "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、CLAUDE.md、プロジェクトドキュメント、独立評価によるドキュメントレビュー。",
+      "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、エージェント指示ファイル（AGENTS.md / CLAUDE.md）、プロジェクトドキュメント、検証済み指摘によるドキュメントレビュー。",
       "category": "documentation",
       "source": "./plugins/doc-authoring-skills-ja",
       "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/doc-authoring-skills-ja"

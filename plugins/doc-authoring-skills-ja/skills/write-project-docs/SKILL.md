@@ -2,24 +2,45 @@
 name: write-project-docs
 description: >
   プロジェクトドキュメント（architecture.md, roadmap.md, security-design.md 等）を作成・更新する際の基準。
+  project documentation / architecture doc / roadmap / security design.
   TRIGGER when: docs/ 配下の architecture.md、roadmap.md、security-design.md 等の
-  プロジェクトドキュメントを新規作成・更新する際に自動実行する。
-  DO NOT TRIGGER when: ADR（write-adr を使用）、CLAUDE.md（write-claude-md を使用）、コードのみの変更。
+  プロジェクトドキュメントを新規作成・更新する際。
+  DO NOT TRIGGER when: ADR（write-adr を使用）、AGENTS.md / CLAUDE.md（write-agent-instructions を使用）、
+  コードのみの変更。
 ---
 
 # プロジェクトドキュメント作成ガイド
+
+## 関連スキルの使い分け
+
+| 対象 | スキル |
+|---|---|
+| architecture.md / roadmap.md 等の docs/ 配下 | `write-project-docs`（本スキル） |
+| 技術的な意思決定の記録 | `write-adr` |
+| AGENTS.md / CLAUDE.md | `write-agent-instructions` |
+| 作成・更新後の検証 | `review-docs` |
 
 ## ドキュメントの役割分担
 
 | ファイル | 対象者 | 内容 | 更新頻度 |
 |---------|--------|------|---------|
-| CLAUDE.md | Claude Code | コマンド、ルール、落とし穴 | 機能追加時 |
+| AGENTS.md（+ CLAUDE.md ブリッジ） | コーディングエージェント | コマンド、ルール、落とし穴 | 機能追加時 |
 | README.md | 全員 | プロジェクト概要、セットアップ | リリース時 |
 | CONTRIBUTING.md | コントリビューター | 開発環境、規約、PR プロセス | 開発環境変更時 |
 | docs/architecture.md | 開発者 | ディレクトリ構造、設計原則、Protocol | アーキテクチャ変更時 |
 | docs/roadmap.md | 全員 | フェーズ、TODO、完了状況 | 機能完了時 |
 | docs/security-design.md | 開発者・監査者 | 脅威モデル、APIキー管理、通信先 | セキュリティ設計変更時 |
 | docs/adr/ | 開発者 | 技術的意思決定の記録 | 重要な判断時 |
+| llms.txt（公開ドキュメントサイトがある場合） | エージェント | 主要ドキュメントへの地図 | 構成変更時 |
+
+## 読者にエージェントが含まれる
+
+ドキュメントは人間だけでなくコーディングエージェントにも読まれる。エージェントは概観よりも、**具体的な答えへの最短経路**を必要とする。
+
+- 見出しで内容が判別できること（「その他」「補足」のような見出しを避ける）
+- 手順にはコピペ可能なコマンドを添えること
+- 一次情報の置き場所を1箇所に決め、他からはリンクすること（同じ事実が2箇所にあると、片方が古くなったとき判別できない）
+- 公開ドキュメントサイトを持つ場合は、主要ページの地図として `llms.txt`（H1・1〜3文の概要・リンク一覧からなる Markdown）を置く
 
 ## 各ドキュメントの書き方
 
@@ -58,3 +79,23 @@ description: >
 - **実装と同期**: コード変更時にドキュメントも更新する。コミットに含める
 - **読者を意識**: 「誰が」「いつ」読むかを考えて書く
 - **具体的に**: 「適切に設定する」ではなく「`keyring.set_password("grabtl", engine, key)` で保存する」
+- **推測を書かない**: 確認していない挙動・数値を断定しない。未確認なら「未確認」と書く
+
+## 複数ドキュメントを更新するとき
+
+1つの変更が複数ドキュメントに波及することが多い。着手前にチェックリストを作り、進捗を追う。
+
+```
+更新対象:
+- [ ] docs/architecture.md — ディレクトリ構造の変更を反映
+- [ ] README.md — セットアップ手順のコマンド変更を反映
+- [ ] docs/roadmap.md — フェーズ2完了をチェック
+- [ ] 相互リンクの整合性を確認
+- [ ] review-docs で検証
+```
+
+漏れやすいのは、**変更したドキュメントを参照している側**。更新したファイル名でリポジトリ全体を検索し、リンク元も確認する。
+
+## 完了条件
+
+作成・更新後、**`review-docs` の基準で検証する。** must-fix 相当の指摘があれば修正してから完了報告する。
