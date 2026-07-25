@@ -109,7 +109,7 @@ description: >
 
 ### 4-2. 実装エージェントを起動する
 
-`Agent` ツールで `subagent_type: "impl-worker"` を起動し、指示書のパスを渡す。この名前で解決できない場合は、このセッションで提示されているエージェントタイプ一覧から該当するものを探す（プラグイン名が前置されている場合がある）。
+`Agent` ツールで `subagent_type: "claude-dev-orchestration-ja:impl-worker"` を起動し、指示書のパスを渡す。この識別子で解決できない場合は、このセッションで提示されているエージェントタイプ一覧から `impl-worker` を含むものを探す。
 
 このエージェントIDは**修正ループで再利用する**ため記録しておく。再依頼は `SendMessage` で同じエージェントに送り、実装時の文脈を保ったまま修正させる。
 
@@ -149,7 +149,7 @@ description: >
 
 ### 5-3. 同梱エージェントを使う場合
 
-`Agent` ツールで `subagent_type: "impl-reviewer"` を起動し、指示書のパスと変更ファイル一覧を渡す。
+`Agent` ツールで `subagent_type: "claude-dev-orchestration-ja:impl-reviewer"` を起動し、指示書のパスと変更ファイル一覧を渡す。この識別子で解決できない場合は、エージェントタイプ一覧から `impl-reviewer` を含むものを探す。
 
 ### 5-4. レビュー結果の集約
 

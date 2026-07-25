@@ -279,13 +279,24 @@ def main() -> None:
     args = parser.parse_args()
 
     paths = sorted(glob.glob(os.path.join(args.root, "*", "*.jsonl")))
-    if args.project:
-        paths = [p for p in paths if args.project in p]
     if not paths:
         print(f"セッション記録が見つかりません: {args.root}")
+        print("--root でセッション記録のディレクトリを指定してください。")
         return
+    if args.project:
+        matched = [p for p in paths if args.project in p]
+        if not matched:
+            names = sorted({os.path.basename(os.path.dirname(p)) for p in paths})
+            print(f"'{args.project}' に一致するプロジェクトがありません。候補:")
+            for n in names:
+                print(f"  {n}")
+            return
+        paths = matched
 
     sessions = [s for s in (parse_session(p) for p in paths) if s["turns"]]
+    if not sessions:
+        print("課金対象のターンを含むセッションがありません。")
+        return
     sessions.sort(key=lambda s: (s["project"], s["session"]))
 
     print_summary(sessions)
