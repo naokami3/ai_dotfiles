@@ -1,6 +1,6 @@
 {
   "name": "claude-dev-orchestration-ja",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "設計・調査をOpus、実装・テストをSonnetに分担させる開発オーケストレーションスキル。設計の承認ゲートを挟み、実装後は外部レビュー手段があればそれに委譲し、無ければ同梱のレビューエージェントで検証する。",
   "author": {
     "name": "naokami3"
