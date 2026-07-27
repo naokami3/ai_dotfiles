@@ -40,6 +40,13 @@
       "category": "documentation",
       "source": "./plugins/doc-authoring-skills-ja",
       "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/doc-authoring-skills-ja"
+    },
+    {
+      "name": "pattern-radar",
+      "description": "観測可能なシグナルからデザインパターンの適用候補を逆引きし、候補と帰結を提示して採否をユーザーに委ねる。設計時とレビュー時で同じ発火条件を使う。Rails / React+TypeScript 対応。",
+      "category": "development",
+      "source": "./plugins/pattern-radar",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/pattern-radar"
     }
   ]
 }
