@@ -1,0 +1,692 @@
+{
+  "skill_name": "pattern-radar",
+  "notes": "category は should_trigger / should_not_trigger / positive_code / negative_code。positive_code はパターンを適用すべき状態、negative_code は指摘したら誤検出になる状態。",
+  "evals": [
+    {
+      "id": 1,
+      "pattern": "Form Object",
+      "category": "should_trigger",
+      "prompt": "会員登録画面で User と Profile を同時に作りたい。規約同意のチェックボックスもあるけど、これはカラムに持たせたくない。どう設計するのがいい？",
+      "expected_output": "1リクエストで2モデル保存＋カラムに無い入力項目というシグナルを挙げ、Form Object / Service(Command) / 現状維持を候補として提示する",
+      "expectations": [
+        "出力が「検出シグナル:」の行から始まり、パターン名から始まっていない",
+        "検出シグナルに「2モデル以上の保存」と「DBカラムに対応しない入力項目（規約同意）」が数えられる事実として書かれている",
+        "候補に Form Object が含まれ、候補の最後が「現状維持」である",
+        "候補に Service(Command) も含まれ、expected_output が要求する3候補がすべて提示されている",
+        "「適用しない条件に該当するか」の行があり、単一モデルに写像できるかを判定している",
+        "コードを書き換えていない"
+      ]
+    },
+    {
+      "id": 2,
+      "pattern": "Form Object",
+      "category": "should_trigger",
+      "prompt": "申込フォームを2ステップにしたいので、validates に on: :step1 と on: :step2 を足そうと思っている。この方針どう思う？",
+      "expected_output": "validates の on: によるコンテキスト分岐をシグナルとして検出し、Form Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルとして validates の on: によるコンテキスト分岐が挙げられている",
+        "候補に Form Object が含まれ、候補の最後が「現状維持」である",
+        "各候補に得るもの / 失うものが書かれている"
+      ]
+    },
+    {
+      "id": 3,
+      "pattern": "Form Object",
+      "category": "should_not_trigger",
+      "prompt": "users テーブルに last_login_at カラムを追加するマイグレーションを書いて",
+      "expected_output": "構造の選択を伴わないため pattern-radar は発火せず、マイグレーションを書くだけ",
+      "expectations": [
+        "パターンの候補提示（「候補: A) ...」形式の出力）が行われていない",
+        "Form Object という語が提案として登場しない"
+      ]
+    },
+    {
+      "id": 4,
+      "pattern": "Form Object",
+      "category": "should_not_trigger",
+      "prompt": "User モデルの email に presence のバリデーションを1つ足したい",
+      "expected_output": "単一モデルに素直に写像でき全フィールドがカラムであるため、Form Object を提案しない",
+      "expectations": [
+        "Form Object が候補として提示されていない",
+        "バリデーションの追加のみが扱われている"
+      ]
+    },
+    {
+      "id": 5,
+      "pattern": "Form Object",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/registrations_controller.rb\ndef create\n  @user = User.new(user_params)\n  @user.save!\n  profile = Profile.new(user: @user, display_name: params[:name])\n  profile.save!\n  session[:agreed] = params[:agreed_to_terms]\n  redirect_to @user\nend\n```",
+      "expected_output": "1アクション内で save! が2回、かつ agreed_to_terms がカラムに無い入力であることを検出し、Form Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに「create で save! が2回」という数えられる事実が行番号付きで書かれている",
+        "候補に Form Object が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない（提案までで止まっている）",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 6,
+      "pattern": "Form Object",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/articles_controller.rb\ndef create\n  @article = Article.new(article_params)\n  if @article.save\n    redirect_to @article\n  else\n    render :new, status: :unprocessable_entity\n  end\nend\n```",
+      "expected_output": "単一モデルに素直に写像でき保存も1回のため、Form Object を指摘しない",
+      "expectations": [
+        "Form Object が候補として提示されていない",
+        "save の回数が2回未満であることが誤って2回以上と報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 7,
+      "pattern": "Service(Command)",
+      "category": "should_trigger",
+      "prompt": "注文確定の処理で、在庫引当とステータス更新と確認メール送信をまとめてやりたい。コントローラに全部書いていい？",
+      "expected_output": "複数モデル横断のトランザクション＋外部I/O というシグナルを検出し、Service(Command) を候補に挙げる",
+      "expectations": [
+        "検出シグナルに「複数モデル横断のトランザクション」と「外部I/O（メール送信）」が書かれている",
+        "候補に Service(Command) が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（モデルのインスタンスメソッドで足りる／貧血ドメイン化のリスク）に触れている"
+      ]
+    },
+    {
+      "id": 8,
+      "pattern": "Service(Command)",
+      "category": "should_trigger",
+      "prompt": "OrdersController#submit が40行くらいになってきた。このまま足していくとまずい気がする。どう分けるべき？",
+      "expected_output": "controller の1アクションが20行超であることを数えて示し、Service(Command) を候補に挙げる",
+      "expectations": [
+        "検出シグナルにアクションの行数が数値で書かれている",
+        "候補に Service(Command) が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 9,
+      "pattern": "Service(Command)",
+      "category": "should_not_trigger",
+      "prompt": "OrdersController のインデントがずれているので直して",
+      "expected_output": "整形のみ。構造の選択を伴わないため候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 10,
+      "pattern": "Service(Command)",
+      "category": "should_not_trigger",
+      "prompt": "Order#total の割引率を10%から8%に変えて",
+      "expected_output": "既存メソッド内の値の変更のみ。Service を提案しない",
+      "expectations": [
+        "Service(Command) が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 11,
+      "pattern": "Service(Command)",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/orders_controller.rb\ndef submit\n  @order = Order.find(params[:id])\n  ActiveRecord::Base.transaction do\n    @order.update!(status: \"submitted\")\n    @order.items.each { |item| Inventory.reserve!(item) }\n    Payment.create!(order: @order, amount: @order.total)\n  end\n  OrderMailer.submitted(@order).deliver_now\n  ExternalCrm.notify(@order)\n  redirect_to @order\nend\n```",
+      "expected_output": "複数モデル横断のトランザクション＋外部I/O が1アクションに同居していることを検出し、Service(Command) を候補に挙げる",
+      "expectations": [
+        "検出シグナルに update! / create! の回数と外部I/Oの存在が事実として書かれている",
+        "候補に Service(Command) が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 12,
+      "pattern": "Service(Command)",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/orders_controller.rb\ndef cancel\n  @order = Order.find(params[:id])\n  @order.cancel!\n  redirect_to @order\nend\n```",
+      "expected_output": "モデルのインスタンスメソッドで足りており、Service を指摘しない",
+      "expectations": [
+        "Service(Command) が候補として提示されていない",
+        "アクションの行数が20行超と誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 13,
+      "pattern": "Query Object",
+      "category": "should_trigger",
+      "prompt": "管理画面の一覧検索で、期間・ステータス・担当者・キーワードの4条件を組み合わせて絞り込みたい。どこに書くべき？",
+      "expected_output": "3つ以上の条件の組み合わせというシグナルを検出し、Query Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに組み合わせる条件の数が数値で書かれている",
+        "候補に Query Object が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（単純 scope）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 14,
+      "pattern": "Query Object",
+      "category": "should_trigger",
+      "prompt": "月次レポートの集計、group と join が入って長くなってる。Order モデルに scope として置いていい？",
+      "expected_output": "集計・レポート系というシグナルを検出し、Query Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルとして集計・レポート系のクエリであることが挙げられている",
+        "候補に Query Object が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 15,
+      "pattern": "Query Object",
+      "category": "should_not_trigger",
+      "prompt": "Order に scope :draft, -> { where(status: 'draft') } を1つ足して",
+      "expected_output": "単純 scope のため Query Object を提案しない",
+      "expectations": [
+        "Query Object が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 16,
+      "pattern": "Query Object",
+      "category": "should_not_trigger",
+      "prompt": "この SQL の実行計画を見て遅い原因を教えて",
+      "expected_output": "性能調査であり構造の選択ではないため候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 17,
+      "pattern": "Query Object",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/admin/orders_controller.rb\ndef index\n  @orders = Order.where(status: params[:status])\n                 .where(created_at: params[:from]..params[:to])\n                 .where(assignee_id: params[:assignee_id])\n                 .where(\"title LIKE ?\", \"%#{params[:q]}%\")\n                 .order(created_at: :desc)\nend\n```",
+      "expected_output": "条件を4つ組み合わせた where を検出し、Query Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに where の条件数が数値で書かれている",
+        "候補に Query Object が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 18,
+      "pattern": "Query Object",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\nclass Order < ApplicationRecord\n  scope :recent, -> { where(created_at: 1.week.ago..) }\nend\n```",
+      "expected_output": "単純 scope のため Query Object を指摘しない",
+      "expectations": [
+        "Query Object が候補として提示されていない",
+        "条件が3つ以上あると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 19,
+      "pattern": "Policy Object",
+      "category": "should_trigger",
+      "prompt": "管理者と作成者だけ編集できて、ただし下書きのときだけ、という権限を入れたい。判定はどこに置くべき？",
+      "expected_output": "権限判定の入れ子というシグナルを検出し、Policy Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに権限判定の条件が入れ子になる事実が書かれている",
+        "候補に Policy Object が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（判定が1箇所1条件）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 20,
+      "pattern": "Policy Object",
+      "category": "should_trigger",
+      "prompt": "current_user.admin? の分岐がコントローラとビューの両方にあって、片方だけ直して事故った。どう整理する？",
+      "expected_output": "ロール分岐が2ファイル以上に散っているシグナルを検出し、Policy Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルにロール分岐が何ファイルに散っているかが書かれている",
+        "候補に Policy Object が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 21,
+      "pattern": "Policy Object",
+      "category": "should_not_trigger",
+      "prompt": "OrdersController#destroy に before_action :require_admin を1つ足して",
+      "expected_output": "判定が1箇所1条件のため Policy Object を提案しない",
+      "expectations": [
+        "Policy Object が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 22,
+      "pattern": "Policy Object",
+      "category": "should_not_trigger",
+      "prompt": "ログイン画面の「パスワードをお忘れですか」の文言を変えて",
+      "expected_output": "文言変更のみ。候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 23,
+      "pattern": "Policy Object",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/orders_controller.rb\ndef edit\n  @order = Order.find(params[:id])\n  if current_user.admin?\n    render :edit\n  elsif @order.user_id == current_user.id\n    if @order.status == \"draft\" && !@order.locked?\n      render :edit\n    else\n      head :forbidden\n    end\n  else\n    head :forbidden\n  end\nend\n```",
+      "expected_output": "権限判定の if がネストしていることを検出し、Policy Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに権限判定の入れ子の深さが事実として書かれている",
+        "候補に Policy Object が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 24,
+      "pattern": "Policy Object",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/reports_controller.rb\ndef index\n  head(:forbidden) and return unless current_user.admin?\n  @reports = Report.all\nend\n```",
+      "expected_output": "判定が1箇所1条件のため Policy Object を指摘しない",
+      "expectations": [
+        "Policy Object が候補として提示されていない",
+        "ロール分岐が2ファイル以上に散っていると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 25,
+      "pattern": "Value Object",
+      "category": "should_trigger",
+      "prompt": "金額と通貨をいつもセットで引き回していて、メソッドの引数も (amount, currency) ばかりになってる。これどうするのがいい？",
+      "expected_output": "プリミティブが常に2つ以上セットで運ばれるシグナルを検出し、Value Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルにプリミティブの組が何回セットで現れるかが書かれている",
+        "候補に Value Object が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（単独で意味が完結する値）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 26,
+      "pattern": "Value Object",
+      "category": "should_trigger",
+      "prompt": "開始日と終了日の比較と表示整形が helper のあちこちに散ってる。設計として直したい",
+      "expected_output": "書式・比較ロジックが helper に散っているシグナルを検出し、Value Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに書式・比較ロジックが散っている箇所数が書かれている",
+        "候補に Value Object が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 27,
+      "pattern": "Value Object",
+      "category": "should_not_trigger",
+      "prompt": "articles テーブルの title の最大長を 255 に変えて",
+      "expected_output": "単独で意味が完結する値であり、Value Object を提案しない",
+      "expectations": [
+        "Value Object が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 28,
+      "pattern": "Value Object",
+      "category": "should_not_trigger",
+      "prompt": "MAX_RETRY_COUNT の定数を 3 から 5 に変えて",
+      "expected_output": "定数値の変更のみ。候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 29,
+      "pattern": "Value Object",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\ndef charge(amount, currency)\n  Payment.create!(amount: amount, currency: currency)\nend\n\ndef refund(amount, currency)\n  Refund.create!(amount: amount, currency: currency)\nend\n\n# app/helpers/money_helper.rb\ndef format_money(amount, currency)\n  \"#{currency} #{number_with_delimiter(amount)}\"\nend\n```",
+      "expected_output": "amount と currency が常にセットで運ばれ、整形ロジックが helper にあることを検出し、Value Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに (amount, currency) の組が現れる回数が数値で書かれている",
+        "候補に Value Object が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 30,
+      "pattern": "Value Object",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/cart_item.rb\nclass CartItem < ApplicationRecord\n  validates :quantity, numericality: { greater_than: 0 }\n\n  def increment!(by = 1)\n    update!(quantity: quantity + by)\n  end\nend\n```",
+      "expected_output": "quantity は単独で意味が完結するため Value Object を指摘しない",
+      "expectations": [
+        "Value Object が候補として提示されていない",
+        "プリミティブが2つ以上セットで運ばれていると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 31,
+      "pattern": "Presenter・Decorator",
+      "category": "should_trigger",
+      "prompt": "モデルに status_label とか formatted_price みたいな表示用メソッドが増えてきた。どこに移すべき？",
+      "expected_output": "表示専用メソッドがモデルに侵入しているシグナルを検出し、Presenter・Decorator を候補に挙げる",
+      "expectations": [
+        "検出シグナルに表示専用メソッドの数が書かれている",
+        "候補に Presenter・Decorator が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（ビューロジックが数行）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 32,
+      "pattern": "Presenter・Decorator",
+      "category": "should_trigger",
+      "prompt": "helper が order の属性を4つ引数で受け取っててつらい。設計としてどう直す？",
+      "expected_output": "helper が引数だらけというシグナルを検出し、Presenter・Decorator を候補に挙げる",
+      "expectations": [
+        "検出シグナルに helper の引数の数が書かれている",
+        "候補に Presenter・Decorator が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 33,
+      "pattern": "Presenter・Decorator",
+      "category": "should_not_trigger",
+      "prompt": "この view の余分な空行を削除して",
+      "expected_output": "整形のみ。候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 34,
+      "pattern": "Presenter・Decorator",
+      "category": "should_not_trigger",
+      "prompt": "一覧画面で在庫が0のときだけ「売切」と出す分岐を view に1行足したい",
+      "expected_output": "ビューロジックが数行のため Presenter を提案しない",
+      "expectations": [
+        "Presenter・Decorator が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 35,
+      "pattern": "Presenter・Decorator",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\nclass Order < ApplicationRecord\n  def status_label\n    I18n.t(\"order.status.#{status}\")\n  end\n\n  def formatted_total\n    ActionController::Base.helpers.number_to_currency(total_amount)\n  end\n\n  def badge_class\n    status == \"shipped\" ? \"badge-green\" : \"badge-gray\"\n  end\nend\n```",
+      "expected_output": "表示専用メソッドが3つモデルに侵入していることを検出し、Presenter・Decorator を候補に挙げる",
+      "expectations": [
+        "検出シグナルに表示専用メソッドの数が数値で書かれている",
+        "候補に Presenter・Decorator が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 36,
+      "pattern": "Presenter・Decorator",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\nclass Order < ApplicationRecord\n  def shipped?\n    status == \"shipped\"\n  end\n\n  def total\n    items.sum(&:subtotal)\n  end\nend\n```",
+      "expected_output": "表示専用メソッドではなくドメインの述語・計算のため Presenter を指摘しない",
+      "expectations": [
+        "Presenter・Decorator が候補として提示されていない",
+        "表示専用メソッドがモデルに侵入していると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 37,
+      "pattern": "Strategy",
+      "category": "should_trigger",
+      "prompt": "料金計算がプランごとに違っていて、プランが増えるたびに case が伸びる。今後もプランは増える予定",
+      "expected_output": "case がアルゴリズム選択で伸びるシグナルを検出し、Strategy を候補に挙げる",
+      "expectations": [
+        "検出シグナルに when 節の数が数値で書かれている",
+        "候補に Strategy が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（分岐が2つで増える見込みがない）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 38,
+      "pattern": "Strategy",
+      "category": "should_trigger",
+      "prompt": "配送方法ごとに送料の計算式を切り替えたい。宅配便・メール便・店舗受取で式が全然違う。どう設計する？",
+      "expected_output": "アルゴリズム選択の分岐というシグナルを検出し、Strategy を候補に挙げる",
+      "expectations": [
+        "検出シグナルにアルゴリズムの種類数が書かれている",
+        "候補に Strategy が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 39,
+      "pattern": "Strategy",
+      "category": "should_not_trigger",
+      "prompt": "この if 文を三項演算子に書き換えて",
+      "expected_output": "書き換え依頼であり構造の選択ではないため候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 40,
+      "pattern": "Strategy",
+      "category": "should_not_trigger",
+      "prompt": "有料会員かどうかで表示を出し分ける2分岐を足したい。分岐が増える予定はない",
+      "expected_output": "分岐が2つで増える見込みがないため Strategy を提案しない",
+      "expectations": [
+        "Strategy が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 41,
+      "pattern": "Strategy",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\ndef total\n  case plan\n  when \"standard\"\n    subtotal + shipping_fee\n  when \"member\"\n    (subtotal * 0.9) + shipping_fee\n  when \"premium\"\n    (subtotal * 0.8) + (shipping_fee / 2)\n  when \"corporate\"\n    (subtotal * 0.85) + shipping_fee + handling_fee\n  end\nend\n```",
+      "expected_output": "when 節が4つのアルゴリズム選択であることを検出し、Strategy を候補に挙げる",
+      "expectations": [
+        "検出シグナルに when 節の数（4）が書かれている",
+        "候補に Strategy が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 42,
+      "pattern": "Strategy",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\ndef status_order\n  case status\n  when \"draft\" then 0\n  when \"submitted\" then 1\n  when \"approved\" then 2\n  end\nend\n```",
+      "expected_output": "値の写像のみでアルゴリズム選択ではないため Strategy を指摘しない（Hash 定数で足りる）",
+      "expectations": [
+        "Strategy が候補として提示されていない",
+        "アルゴリズム選択の分岐であると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 43,
+      "pattern": "State Machine",
+      "category": "should_trigger",
+      "prompt": "注文に status を draft / submitted / approved / shipped で持たせたい。承認したらメールも送りたい",
+      "expected_output": "status カラム＋遷移規則＋遷移時の副作用というシグナルを検出し、State Machine を候補に挙げる",
+      "expectations": [
+        "検出シグナルに状態の数と遷移に副作用があることが書かれている",
+        "候補に State Machine が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（単なる真偽フラグ）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 44,
+      "pattern": "State Machine",
+      "category": "should_trigger",
+      "prompt": "承認フローで、差し戻し済みからいきなり発送済みに飛べてしまうバグが出た。遷移規則をどこに書くべき？",
+      "expected_output": "遷移規則が必要というシグナルを検出し、State Machine を候補に挙げる",
+      "expectations": [
+        "検出シグナルに不正な遷移が可能である事実が書かれている",
+        "候補に State Machine が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 45,
+      "pattern": "State Machine",
+      "category": "should_not_trigger",
+      "prompt": "articles に published（true/false）のフラグを足したい",
+      "expected_output": "単なる真偽フラグのため State Machine を提案しない",
+      "expectations": [
+        "State Machine が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 46,
+      "pattern": "State Machine",
+      "category": "should_not_trigger",
+      "prompt": "status の日本語表示を i18n の locale ファイルに移して",
+      "expected_output": "表示文言の移動のみ。候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 47,
+      "pattern": "State Machine",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/orders_controller.rb\ndef approve\n  @order.update!(status: \"approved\")\n  OrderMailer.approved(@order).deliver_later\nend\n\n# app/services/shipping.rb\ndef ship(order)\n  order.update!(status: \"shipped\") if order.status == \"approved\"\n  Inventory.release!(order)\nend\n```",
+      "expected_output": "status の更新と遷移条件・副作用が複数ファイルに散っていることを検出し、State Machine を候補に挙げる",
+      "expectations": [
+        "検出シグナルに status 更新の箇所数と遷移に副作用がある事実が書かれている",
+        "候補に State Machine が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 48,
+      "pattern": "State Machine",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/article.rb\nclass Article < ApplicationRecord\n  def publish!\n    update!(published: true)\n  end\n\n  def unpublish!\n    update!(published: false)\n  end\nend\n```",
+      "expected_output": "真偽フラグの反転のみで遷移規則も副作用もないため State Machine を指摘しない",
+      "expectations": [
+        "State Machine が候補として提示されていない",
+        "状態が3つ以上あると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 49,
+      "pattern": "Null Object",
+      "category": "should_trigger",
+      "prompt": "current_user が nil のときの分岐が、コントローラとビューとモデルの3箇所に同じように書いてある。どう整理する？",
+      "expected_output": "同一対象への nil 分岐が3箇所以上というシグナルを検出し、Null Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに nil 分岐の箇所数（3以上）が書かれている",
+        "候補に Null Object が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（nil が例外的で1箇所）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 50,
+      "pattern": "Null Object",
+      "category": "should_trigger",
+      "prompt": "user&.profile&.name || 'ゲスト' みたいな書き方が何箇所も出てきてる。設計としてどうすべき？",
+      "expected_output": "安全呼び出し＋既定値の重複というシグナルを検出し、Null Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに重複している箇所数が書かれている",
+        "候補に Null Object が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 51,
+      "pattern": "Null Object",
+      "category": "should_not_trigger",
+      "prompt": "この1箇所の nil チェックを safe navigation 演算子に書き換えて",
+      "expected_output": "1箇所の書き換えのみ。Null Object を提案しない",
+      "expectations": [
+        "Null Object が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 52,
+      "pattern": "Null Object",
+      "category": "should_not_trigger",
+      "prompt": "find_by が nil を返したときに 404 を返すようにして",
+      "expected_output": "nil が例外的で既定の振る舞いが定義できないため Null Object を提案しない",
+      "expectations": [
+        "Null Object が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 53,
+      "pattern": "Null Object",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/models/order.rb\ndef assignee_name\n  return \"未割当\" if assignee.nil?\n  assignee.name\nend\n\ndef assignee_email\n  assignee.blank? ? \"\" : assignee.email\nend\n\ndef assigned?\n  assignee.present?\nend\n```",
+      "expected_output": "同一レシーバ assignee への nil 系分岐が3箇所あることを検出し、Null Object を候補に挙げる",
+      "expectations": [
+        "検出シグナルに「assignee への nil?/blank?/present? が3箇所」という数えられる事実が書かれている",
+        "候補に Null Object が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 54,
+      "pattern": "Null Object",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/services/import.rb\ndef call(row)\n  raise ArgumentError, \"email が空\" if row[:email].blank?\n  User.create!(email: row[:email])\nend\n```",
+      "expected_output": "nil が例外的で分岐が1箇所のため Null Object を指摘しない",
+      "expectations": [
+        "Null Object が候補として提示されていない",
+        "nil 分岐が3箇所以上あると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    },
+    {
+      "id": 55,
+      "pattern": "Adapter・Gateway",
+      "category": "should_trigger",
+      "prompt": "Stripe の SDK をコントローラから直接呼んでいて、テストでモックできなくて困ってる。どう設計すべき？",
+      "expected_output": "外部SDKの型がドメイン層に露出し、テストでモックが困難というシグナルを検出し、Adapter・Gateway を候補に挙げる",
+      "expectations": [
+        "検出シグナルに外部SDKの呼び出し箇所とモックの困難さが事実として書かれている",
+        "候補に Adapter・Gateway が含まれ、候補の最後が「現状維持」である",
+        "適用しない条件（使い捨ての一箇所呼び出し）と照合した結果が書かれている"
+      ]
+    },
+    {
+      "id": 56,
+      "pattern": "Adapter・Gateway",
+      "category": "should_trigger",
+      "prompt": "外部の配送APIを2箇所から呼んでいて、返ってきた Hash をそのままビューに渡してる。どう整理する？",
+      "expected_output": "外部レスポンスの型がドメイン/表示層に露出しているシグナルを検出し、Adapter・Gateway を候補に挙げる",
+      "expectations": [
+        "検出シグナルに呼び出し箇所数と外部の型が露出している事実が書かれている",
+        "候補に Adapter・Gateway が含まれ、候補の最後が「現状維持」である"
+      ]
+    },
+    {
+      "id": 57,
+      "pattern": "Adapter・Gateway",
+      "category": "should_not_trigger",
+      "prompt": "Gemfile の stripe のバージョンを上げて bundle update して",
+      "expected_output": "依存更新のみ。候補提示をしない",
+      "expectations": [
+        "パターンの候補提示が行われていない"
+      ]
+    },
+    {
+      "id": 58,
+      "pattern": "Adapter・Gateway",
+      "category": "should_not_trigger",
+      "prompt": "移行用の rake タスクの中で、外部APIを1回だけ叩いて結果を CSV に落とすスクリプトを書いて",
+      "expected_output": "使い捨ての一箇所呼び出しのため Adapter・Gateway を提案しない",
+      "expectations": [
+        "Adapter・Gateway が候補として提示されていない"
+      ]
+    },
+    {
+      "id": 59,
+      "pattern": "Adapter・Gateway",
+      "category": "positive_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# app/controllers/payments_controller.rb\ndef create\n  charge = Stripe::Charge.create(amount: @order.total_amount, currency: \"jpy\", source: params[:token])\n  @order.update!(charge_id: charge.id, paid: charge.status == \"succeeded\")\nrescue Stripe::CardError => e\n  render :new, alert: e.message\nend\n\n# app/models/order.rb\ndef charge_status\n  Stripe::Charge.retrieve(charge_id).status\nend\n```",
+      "expected_output": "外部SDKの型と例外がコントローラ・モデルに露出していることを検出し、Adapter・Gateway を候補に挙げる",
+      "expectations": [
+        "検出シグナルに SDK の呼び出し箇所数と SDK 例外がドメイン層に現れている事実が書かれている",
+        "候補に Adapter・Gateway が含まれ、候補の最後が「現状維持」である",
+        "コードが書き換えられていない",
+        "「帰結:」の行が候補と同じラベル・同じ数だけ書かれている"
+      ]
+    },
+    {
+      "id": 60,
+      "pattern": "Adapter・Gateway",
+      "category": "negative_code",
+      "prompt": "このコードをレビューして。\n\n```ruby\n# lib/tasks/one_shot_export.rake\ntask export_legacy: :environment do\n  res = Net::HTTP.get(URI(\"https://legacy.example.com/orders.json\"))\n  File.write(\"tmp/orders.json\", res)\nend\n```",
+      "expected_output": "使い捨ての一箇所呼び出しのため Adapter・Gateway を指摘しない",
+      "expectations": [
+        "Adapter・Gateway が候補として提示されていない",
+        "外部SDKの型がドメイン層に露出していると誤って報告されていない",
+        "貼られたコードについて判定を行ったうえで、シグナルが立たない旨（「検出なし」等）を明示している"
+      ]
+    }
+  ]
+}

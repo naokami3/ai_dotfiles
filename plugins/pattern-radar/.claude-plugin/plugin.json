@@ -1,0 +1,10 @@
+{
+  "name": "pattern-radar",
+  "version": "1.0.0",
+  "description": "観測可能なシグナルからデザインパターンの適用候補を逆引きし、候補と帰結を提示してユーザーに判断を委ねる。設計時とレビュー時で同じ発火条件を使う。Rails / React+TypeScript 対応。",
+  "author": {
+    "name": "naokami3"
+  },
+  "license": "MIT",
+  "keywords": ["design-pattern", "refactoring", "code-review", "rails", "react", "typescript", "architecture", "japanese"]
+}
