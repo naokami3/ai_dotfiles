@@ -630,3 +630,42 @@ class TestScriptClassification(unittest.TestCase):
     def test_調査より実行系を優先する(self):
         self.assertEqual(analyze.classify_bash("cat setup.cfg && pytest"), "テスト実行")
         self.assertEqual(analyze.classify_bash("ls && python3 build.py"), "スクリプト実行(Python)")
+
+
+class TestToolWaits(TempSessionRoot):
+    def analyze(self, records):
+        path = write_session(self.root, "proj", "aaaaaaaa", records)
+        return analyze.analyze_tasks(analyze.parse_session(path))
+
+    def test_ツールごとに発行から結果までを測る(self):
+        report = self.analyze([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "grep -rn TODO .")]),
+            tool_result(25, "t1"),
+        ])
+        self.assertEqual(report["tool_waits"]["Bash(grep)"], [15])
+
+    def test_並列ツールは個別に測る(self):
+        report = self.analyze([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "cat a"), ("t2", "Read", {})]),
+            tool_result(20, "t1"),
+            tool_result(50, "t2"),
+        ])
+        self.assertEqual(report["tool_waits"]["Bash(cat)"], [10])
+        self.assertEqual(report["tool_waits"]["Read"], [40])
+
+    def test_継続行をコマンド名にしない(self):
+        report = self.analyze([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "ls -S \\\n  -l /tmp")]),
+            tool_result(20, "t1"),
+        ])
+        self.assertIn("Bash(ls)", report["tool_waits"])
+
+    def test_結果が返らないツールは数えない(self):
+        report = self.analyze([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "cat a")]),
+        ])
+        self.assertEqual(report["tool_waits"], {})
