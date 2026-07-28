@@ -135,6 +135,11 @@ UNPARSEABLE_PATTERNS = [
     r"^\s*(if|for|while|until|case|function)\b",
 ]
 
+# 出力がそのままコンテキストに入る読み取りコマンド。
+# パイプやリダイレクトで次のコマンドへ渡している場合は内容が入らない。
+READ_COMMANDS = {"cat", "head", "tail", "less"}
+PIPE_SPLIT = re.compile(r"(\|\||&&|;|\|)")
+
 QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 HEREDOC = re.compile(r"<<-?\s*'?(\w+)'?\n.*?^\1\s*$", re.DOTALL | re.MULTILINE)
 ENV_ASSIGN = re.compile(r"^[A-Za-z_]\w*=")
@@ -219,6 +224,36 @@ def category_rank(category: str) -> int:
     """優先順位表での順番。スクリプト実行(言語) は言語を落として引く。"""
     base = "スクリプト実行" if category.startswith("スクリプト実行") else category
     return CATEGORY_PRIORITY.index(base) if base in CATEGORY_PRIORITY else len(CATEGORY_PRIORITY)
+
+
+def looks_like_path(token: str) -> bool:
+    """ファイルパスらしいトークンか。オプションやヒアドキュメントの目印を除く。"""
+    cleaned = token.strip("\"'")
+    if not cleaned or cleaned.startswith(("-", "<<")):
+        return False
+    return "/" in cleaned or "." in cleaned
+
+
+def context_read_targets(command: str) -> list[str]:
+    """コンテキストに内容が入る読み取りの対象を返す。
+
+    `cat x | grep y` のようにパイプやリダイレクトで別のコマンドへ渡している場合、
+    内容はコンテキストに入らないため数えない。読み直しの多さを測るのが目的で、
+    パイプ経由まで数えると実態より多く見える。
+    """
+    targets: list[str] = []
+    for chunk in HEREDOC.sub("", command).split("\n"):
+        parts = PIPE_SPLIT.split(chunk)
+        for i, segment in enumerate(parts):
+            if segment in {"||", "&&", ";", "|"}:
+                continue
+            tokens = command_head(segment)
+            if not tokens or os.path.basename(tokens[0].strip("\"'")) not in READ_COMMANDS:
+                continue
+            if (i + 1 < len(parts) and parts[i + 1] == "|") or ">" in segment:
+                continue
+            targets += [t.strip("\"'") for t in tokens[1:] if looks_like_path(t)]
+    return targets
 
 
 def merge_categories(categories: list[str]) -> str:
@@ -308,6 +343,7 @@ def parse_session(path: str) -> dict:
     events: list[dict] = []
     bundles: dict[str, dict] = {}
     turn_durations: list[dict] = []
+    reads: dict[str, int] = defaultdict(int)
 
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -315,7 +351,7 @@ def parse_session(path: str) -> dict:
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            collect_event(rec, events, bundles, turn_durations)
+            collect_event(rec, events, bundles, turn_durations, reads)
             message = rec.get("message") or {}
             content = message.get("content")
 
@@ -380,6 +416,7 @@ def parse_session(path: str) -> dict:
         "events": events,
         "bundles": bundles,
         "turn_durations": turn_durations,
+        "reads": dict(reads),
     }
 
 
@@ -411,7 +448,17 @@ def bundle_key(rec: dict) -> str | None:
     return rec.get("requestId") or rec.get("uuid")
 
 
-def collect_event(rec: dict, events: list, bundles: dict, turn_durations: list) -> None:
+def read_targets_of(block: dict) -> list[str]:
+    """1つの tool_use が読み込んだファイル（コンテキストに入るもの）を返す。"""
+    name, inp = block.get("name"), block.get("input") or {}
+    if name in ("Read", "NotebookRead") and inp.get("file_path"):
+        return [inp["file_path"]]
+    if name == "Bash":
+        return context_read_targets(inp.get("command", ""))
+    return []
+
+
+def collect_event(rec: dict, events: list, bundles: dict, turn_durations: list, reads: dict) -> None:
     """1レコードをタイムライン用のイベントとして記録する。
 
     時間計測は物理レコードの順序で行うため、ここでは束ねない。
@@ -447,6 +494,9 @@ def collect_event(rec: dict, events: list, bundles: dict, turn_durations: list) 
         return
 
     tool_uses = [b for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+    for block in tool_uses:
+        for target in read_targets_of(block):
+            reads[target] += 1
     events.append(
         {
             "ts": ts,
@@ -954,6 +1004,7 @@ def print_tasks(sessions: list[dict]) -> None:
     print("  ※ 処理入力は過去のコンテキストを含む課金上の処理量で、タスク固有量ではない。")
 
     print_tool_waits(reports)
+    print_duplicate_reads(sessions)
     print_task_warnings(reports)
 
 
@@ -984,6 +1035,31 @@ def print_tool_waits(reports: list[dict], top: int = 12) -> None:
         print(f"  （残り {hidden} 種類は省略）")
     print("  ※ 並列実行したツールは同じ時間帯を共有するため、合計は実時間を超えることがある。")
     print("     カテゴリ別の時間（重複なしの区間分割）とは別の見方であり、足し合わせて比較しない。")
+
+
+def print_duplicate_reads(sessions: list[dict], top: int = 8) -> None:
+    """同一セッションで2回以上読んだファイルを出す。
+
+    別セッションでの再読み込みは文脈が違うので重複としない。
+    """
+    extra = 0
+    targets: dict[str, int] = defaultdict(int)
+    for session in sessions:
+        for path, count in session.get("reads", {}).items():
+            if count > 1:
+                extra += count - 1
+                targets[path] = max(targets[path], count)
+    if not extra:
+        return
+
+    total = sum(sum(s.get("reads", {}).values()) for s in sessions)
+    print(f"\n警告: 同一セッションで2回以上読んだファイルが {len(targets)}件")
+    print(f"  余分な読み取り {extra}回 / コンテキストに入る読み取り全体 {total}回"
+          f"（{extra / max(1, total) * 100:.0f}%）")
+    for path, count in sorted(targets.items(), key=lambda x: -x[1])[:top]:
+        print(f"    {count:>3}回  {path}")
+    print("  ※ パイプやリダイレクトで別コマンドへ渡した読み取りは、内容がコンテキストに")
+    print("     入らないため数えていない。")
 
 
 def print_task_warnings(reports: list[dict]) -> None:

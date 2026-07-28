@@ -669,3 +669,48 @@ class TestToolWaits(TempSessionRoot):
             assistant(10, tool_uses=[bash("t1", "cat a")]),
         ])
         self.assertEqual(report["tool_waits"], {})
+
+
+class TestDuplicateReads(TempSessionRoot):
+    def reads(self, records):
+        path = write_session(self.root, "proj", "aaaaaaaa", records)
+        return analyze.parse_session(path)["reads"]
+
+    def test_Readとcatの両方を数える(self):
+        result = self.reads([
+            prompt(0),
+            assistant(10, tool_uses=[("t1", "Read", {"file_path": "a.py"})]),
+            assistant(20, request_id="r2", tool_uses=[bash("t2", "cat b.py")]),
+        ])
+        self.assertEqual(result, {"a.py": 1, "b.py": 1})
+
+    def test_パイプ経由は数えない(self):
+        result = self.reads([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "cat payload.md | ./send.sh")]),
+        ])
+        self.assertEqual(result, {})
+
+    def test_リダイレクトも数えない(self):
+        result = self.reads([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "cat a.py > b.py")]),
+        ])
+        self.assertEqual(result, {})
+
+    def test_同一ファイルの読み直しを数える(self):
+        result = self.reads([
+            prompt(0),
+            assistant(10, tool_uses=[("t1", "Read", {"file_path": "x.md"})]),
+            assistant(20, request_id="r2", tool_uses=[("t2", "Read", {"file_path": "x.md"})]),
+            assistant(30, request_id="r3", tool_uses=[bash("t3", "cat x.md")]),
+        ])
+        self.assertEqual(result["x.md"], 3)
+
+    def test_オプションやヒアドキュメントを対象にしない(self):
+        result = self.reads([
+            prompt(0),
+            assistant(10, tool_uses=[bash("t1", "cat -n a.py")]),
+            assistant(20, request_id="r2", tool_uses=[bash("t2", "cat > note.md <<'EOF'\nx\nEOF")]),
+        ])
+        self.assertEqual(result, {"a.py": 1})
