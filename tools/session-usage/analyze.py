@@ -392,6 +392,20 @@ def parse_ts(value) -> datetime | None:
         return None
 
 
+def tool_label(block: dict) -> str:
+    """ツールの表示名。Bash は実行コマンドの先頭を添えて Bash(grep) の形にする。"""
+    name = block.get("name") or "(名前なし)"
+    if name != "Bash":
+        return name
+    for segment in SEGMENT_SPLIT.split(strip_noise((block.get("input") or {}).get("command", ""))):
+        head = command_head(segment)
+        # オプションや記号で始まるセグメントは複数行コマンドの継続行なので、
+        # コマンド名として採用しない（Bash(-S) のような無意味なラベルを避ける）
+        if head and head[0][:1].isalnum():
+            return f"Bash({os.path.basename(head[0])})"
+    return "Bash(その他)"
+
+
 def bundle_key(rec: dict) -> str | None:
     """分類とトークン計上の単位。requestId が無いレコードは uuid 単位で独立させる。"""
     return rec.get("requestId") or rec.get("uuid")
@@ -439,6 +453,7 @@ def collect_event(rec: dict, events: list, bundles: dict, turn_durations: list) 
             "kind": "assistant",
             "bundle": key,
             "tool_use_ids": [b.get("id") for b in tool_uses if b.get("id")],
+            "tool_labels": {b.get("id"): tool_label(b) for b in tool_uses if b.get("id")},
             "human_ids": {b.get("id") for b in tool_uses if b.get("name") in HUMAN_WAIT_TOOLS and b.get("id")},
             "is_sub": bool(rec.get("isSidechain")),
         }
@@ -618,6 +633,29 @@ def verify_turn_durations(
     return result
 
 
+def tool_wait_times(events: list[dict]) -> tuple[dict[str, list[float]], int]:
+    """ツールごとの「発行から結果が返るまで」の秒数を集める。
+
+    区間の分割（重複なし）とは別枠の診断値。並列実行したツールは同じ時間帯を
+    共有するため、合計はセッションの実時間を超えうる。呼び出し側で明示すること。
+    """
+    started: dict[str, tuple[datetime, str]] = {}
+    waits: dict[str, list[float]] = defaultdict(list)
+    unfinished = 0
+    for event in events:
+        if event["kind"] == "assistant":
+            for tool_id, label in event.get("tool_labels", {}).items():
+                started[tool_id] = (event["ts"], label)
+        elif event["kind"] == "tool_result":
+            for tool_id in event.get("tool_result_ids", []):
+                if tool_id not in started:
+                    continue
+                start, label = started.pop(tool_id)
+                waits[label].append(max(0.0, (event["ts"] - start).total_seconds()))
+    unfinished = len(started)
+    return dict(waits), unfinished
+
+
 def analyze_tasks(session: dict) -> dict:
     """1セッションをカテゴリ別の時間・トークン・コストに落とす。"""
     events = [e for e in session["events"] if e["kind"] != "system"]
@@ -707,6 +745,7 @@ def analyze_tasks(session: dict) -> dict:
         "session": session["session"],
         "categories": dict(categories),
         "unexplained": unexplained,
+        "tool_waits": tool_wait_times(events)[0],
         "mixed_turns": mixed_turns,
         "unknown_deltas": unknown_deltas,
         "orphan_results": orphan_results,
@@ -914,7 +953,37 @@ def print_tasks(sessions: list[dict]) -> None:
     print("  ※ 入力増分は推定値。圧縮・モデル切替・初回のターンは加算していない。")
     print("  ※ 処理入力は過去のコンテキストを含む課金上の処理量で、タスク固有量ではない。")
 
+    print_tool_waits(reports)
     print_task_warnings(reports)
+
+
+def print_tool_waits(reports: list[dict], top: int = 12) -> None:
+    """ツール別の応答待ちを、合計の大きい順に出す。"""
+    waits: dict[str, list[float]] = defaultdict(list)
+    for report in reports:
+        for label, values in report["tool_waits"].items():
+            waits[label].extend(values)
+    if not waits:
+        return
+
+    print("\n=== ツール別の応答待ち（発行から結果が返るまで） ===")
+    header = f"{'ツール':<22} {'回数':>6} {'合計':>9} {'中央値':>8} {'p90':>8} {'最大':>8}"
+    print(header)
+    print("-" * len(header))
+    ranked = sorted(waits.items(), key=lambda x: -sum(x[1]))
+    for label, values in ranked[:top]:
+        values.sort()
+        median = values[len(values) // 2]
+        p90 = values[min(len(values) - 1, int(len(values) * 0.9))]
+        print(
+            f"{label[:22]:<22} {len(values):>6} {fmt_duration(sum(values)):>9} "
+            f"{fmt_duration(median):>8} {fmt_duration(p90):>8} {fmt_duration(values[-1]):>8}"
+        )
+    hidden = len(ranked) - top
+    if hidden > 0:
+        print(f"  （残り {hidden} 種類は省略）")
+    print("  ※ 並列実行したツールは同じ時間帯を共有するため、合計は実時間を超えることがある。")
+    print("     カテゴリ別の時間（重複なしの区間分割）とは別の見方であり、足し合わせて比較しない。")
 
 
 def print_task_warnings(reports: list[dict]) -> None:
