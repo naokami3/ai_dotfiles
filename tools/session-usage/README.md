@@ -98,6 +98,23 @@ Bash はコマンドの先頭を添えて `Bash(cat)` の形にします。オ�
 中央値と最大値を並べているのは、合計が「全体的に遅い」のか「数件の外れ値」なのかを
 切り分けるためです。
 
+**重複読み取り**
+
+同一セッションで2回以上読んだファイルを警告に出します。編集のたびに読み直していないか、
+同じ調査を繰り返していないかを見るためです。
+
+```
+警告: 同一セッションで2回以上読んだファイルが 8件
+  余分な読み取り 11回 / コンテキストに入る読み取り全体 112回（10%）
+      3回  plugins/pattern-radar/skills/pattern-radar/scripts/detect.rb
+```
+
+`cat x | grep y` のようにパイプやリダイレクトで別コマンドへ渡した読み取りは、内容が
+コンテキストに入らないため数えません。ここを区別しないと実態の倍近く多く見えます
+（実測では 112回に対しパイプ経由が 84回ありました）。
+
+別セッションでの再読み込みは文脈が違うので重複としません。
+
 **検算**
 
 `system` レコードの `turn_duration`（`durationMs`）とターン単位で突き合わせ、最大絶対誤差と最大相対誤差を出します。
@@ -177,6 +194,24 @@ Bash は**実行コマンドの位置だけ**を見ます。引用文字列と�
 python3 analyze.py --simulate --review-turns 5
 python3 analyze.py --simulate --delegate-model claude-haiku-4-5
 ```
+
+## セッション記録の構造（調査メモ）
+
+`--tasks` の実装で確かめた事実。JSONL の形式は公開仕様ではないため、依存する前に実測した結果を残す。
+再調査せずに済むよう、確かめ方も併記する。
+
+| 事実 | 確かめ方 |
+|---|---|
+| `timestamp` は user / assistant / system の全レコードに付く | 全レコードを走査して欠損数を数えた（欠損 0） |
+| **`ts(assistant)` は当該メッセージの完了時刻** | 単一 assistant で完結したターンで `durationMs` と `ts(assistant) - ts(直前user)` が一致（17.4s/17.4s、42.7s/42.6s） |
+| `tool_use` と `tool_result` は `tool_use_id` で確実に対応が取れる | 2172件を突合し失敗 0 |
+| `system` の `subtype=turn_duration` は検算に使える | 全プロジェクトで249件。直近 assistant の 0.3〜0.5秒後に書かれる |
+| 同一 `requestId` のレコードが複数現れ、同じ `usage` を繰り返す | thinking / text / tool_use がブロックごとに別レコードになるため。重複除去しないと2倍以上に過大計上する |
+| **Bash の先頭トークンでは用途を判定できない** | 実データの先頭分布は `cd` 440 / 変数代入 72 / `git` 71 / `python3` 62 / `grep` 59 / `bash` 56 / `set` 35 |
+| `attributionSkill` にスキル名が入る | 実データで `xrev:xrev` 386件、`ai-slop-review-ja` 114件などを確認 |
+
+`durationMs` を持つのは `turn_duration` レコードだけで、ツール個別の実行時間は記録されない。
+そのため所要時間は timestamp の差分から求めるしかない。
 
 ## 単価について
 
