@@ -18,6 +18,7 @@ description: >
 | AGENTS.md / CLAUDE.md and other agent instruction files | `write-agent-instructions` (this skill) |
 | Technical decision records | `write-adr` |
 | architecture.md / roadmap.md and other docs/ content | `write-project-docs` |
+| Human-facing HTML docs (overview, detailed specs, diagrams) | `write-html-docs` |
 | Verification after authoring | `review-docs` |
 
 ## Which File to Write

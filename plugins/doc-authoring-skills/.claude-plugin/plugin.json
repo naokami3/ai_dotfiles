@@ -1,10 +1,10 @@
 {
   "name": "doc-authoring-skills",
-  "version": "2.0.0",
-  "description": "Skills for authoring and reviewing technical documents: ADRs, agent instruction files (AGENTS.md / CLAUDE.md), project docs, and document review driven by verified findings.",
+  "version": "2.1.0",
+  "description": "Skills for authoring and reviewing technical documents: ADRs, agent instruction files (AGENTS.md / CLAUDE.md), project docs, optional human-facing HTML docs with diagrams, and document review driven by verified findings.",
   "author": {
     "name": "naokami3"
   },
   "license": "MIT",
-  "keywords": ["docs", "adr", "agents-md", "claude-md", "review", "documentation", "technical-writing"]
+  "keywords": ["docs", "adr", "agents-md", "claude-md", "review", "documentation", "technical-writing", "html-docs", "diagrams"]
 }

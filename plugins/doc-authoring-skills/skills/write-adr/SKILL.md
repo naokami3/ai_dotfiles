@@ -18,6 +18,7 @@ Record technical decisions in `docs/adr/NNNN-<slug>.md`.
 | Technical decision records | `write-adr` (this skill) |
 | AGENTS.md / CLAUDE.md | `write-agent-instructions` |
 | architecture.md / roadmap.md and other docs/ content | `write-project-docs` |
+| Human-facing HTML docs (overview, detailed specs, diagrams) | `write-html-docs` |
 | Verification after authoring | `review-docs` |
 
 ## Purpose of ADRs
