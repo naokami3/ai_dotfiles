@@ -19,6 +19,7 @@ description: >
 | AGENTS.md / CLAUDE.md 等のエージェント指示ファイル | `write-agent-instructions`（本スキル） |
 | 技術的な意思決定の記録 | `write-adr` |
 | architecture.md / roadmap.md 等の docs/ 配下 | `write-project-docs` |
+| 人間向け HTML 資料（概観・詳細仕様・図） | `write-html-docs` |
 | 作成・更新後の検証 | `review-docs` |
 
 ## どのファイルに書くか
