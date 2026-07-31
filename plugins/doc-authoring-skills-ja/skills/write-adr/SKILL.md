@@ -19,6 +19,7 @@ description: >
 | 技術的な意思決定の記録 | `write-adr`（本スキル） |
 | AGENTS.md / CLAUDE.md | `write-agent-instructions` |
 | architecture.md / roadmap.md 等の docs/ 配下 | `write-project-docs` |
+| 人間向け HTML 資料（概観・詳細仕様・図） | `write-html-docs` |
 | 作成後の検証 | `review-docs` |
 
 ## ADR の目的

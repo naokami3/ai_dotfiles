@@ -1,10 +1,10 @@
 {
   "name": "doc-authoring-skills-ja",
-  "version": "2.0.0",
-  "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、エージェント指示ファイル（AGENTS.md / CLAUDE.md）、プロジェクトドキュメント、検証済み指摘によるドキュメントレビュー。",
+  "version": "2.1.0",
+  "description": "技術ドキュメントの作成・レビュー用スキル集（日本語版）: ADR、エージェント指示ファイル（AGENTS.md / CLAUDE.md）、プロジェクトドキュメント、人間向け HTML 資料（オプション・図付き）、検証済み指摘によるドキュメントレビュー。",
   "author": {
     "name": "naokami3"
   },
   "license": "MIT",
-  "keywords": ["docs", "adr", "agents-md", "claude-md", "review", "documentation", "technical-writing", "japanese"]
+  "keywords": ["docs", "adr", "agents-md", "claude-md", "review", "documentation", "technical-writing", "html-docs", "diagrams", "japanese"]
 }

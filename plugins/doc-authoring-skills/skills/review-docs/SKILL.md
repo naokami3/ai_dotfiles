@@ -20,6 +20,7 @@ You are an **independent document reviewer**. Judge by whether the reader will a
 | Technical decision records | `write-adr` |
 | AGENTS.md / CLAUDE.md | `write-agent-instructions` |
 | architecture.md / roadmap.md and other docs/ content | `write-project-docs` |
+| Human-facing HTML docs (overview, detailed specs, diagrams) | `write-html-docs` |
 
 ## Independence Requirement
 
@@ -48,7 +49,15 @@ For each item, hold concrete evidence: the files you read, the commands you ran 
 - [ ] Ran every documented command, or cross-checked it against source (package.json, Makefile, CI config, etc.)
 - [ ] Confirmed every function, class, and config key named in the document exists in the code
 - [ ] Confirmed the source of every number, version, and limit
-- [ ] Confirmed every link to another document resolves
+- [ ] **Machine-checked every link and anchor** — run the bundled
+      `scripts/check-doc-links.py <repo root>` (resolves relative links in md and HTML and
+      verifies `#anchor` targets with GitHub-compatible rules)
+- [ ] If generated documents exist (md canon → HTML etc.), confirmed **regeneration matches**
+      (generate into a temporary directory and `cmp`; never write to the working tree)
+
+When a new document disagrees with the existing canon, do not assume the new document is the one
+at fault: **the canon may be stale**. Use the implementation as the third point of comparison,
+decide which side must change, and say so explicitly in the finding's Fix line.
 
 ### Sufficiency — Is it neither too much nor too little?
 
@@ -65,6 +74,17 @@ For each item, hold concrete evidence: the files you read, the commands you ran 
 
 - [ ] Searched for vague phrases such as "configure appropriately" or "modify as needed"
 - [ ] Confirmed that every place giving instructions has a runnable command or concrete example
+
+### HTML Docs — when the target includes HTML (deliverables of `write-html-docs`)
+
+- [ ] Machine-checked tag balance (e.g. via `html.parser`)
+- [ ] Checked the rendered result in **both light and dark modes** (headless browser screenshots;
+      note that headless Chrome inherits the OS dark-mode setting)
+- [ ] Cross-checked **factual claims inside diagrams** (command names, exit codes, step ordering,
+      state transitions, numbers) against the canon and the implementation — diagrams are an
+      alternative representation of the spec, not decoration
+- [ ] Checked SVG accessibility (`role="img"` plus `<title>`; meaning not conveyed by color alone)
+- [ ] Confirmed generated pages were not hand-edited (regeneration from the md canon matches)
 
 ## Handling Items You Could Not Verify
 

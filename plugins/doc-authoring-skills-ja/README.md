@@ -9,7 +9,8 @@
 | `write-adr` | ADR（Architecture Decision Record）を構造化フォーマットで作成 |
 | `write-agent-instructions` | エージェント指示ファイル（AGENTS.md を正、CLAUDE.md はブリッジ）を作成・更新 |
 | `write-project-docs` | プロジェクトドキュメント（architecture.md, roadmap.md 等）の作成基準 |
-| `review-docs` | 実装と突合した検証済み指摘（findings）を出し、総合判定を機械的に算出する独立レビュー |
+| `write-html-docs` | 人間向け HTML 資料（図付き概観・詳細仕様）を md 正典から作る基準。**オプション**（md だけで足りるなら作らない） |
+| `review-docs` | 実装と突合した検証済み指摘（findings）を出し、総合判定を機械的に算出する独立レビュー。リンク全数検証スクリプト同梱 |
 
 ## 設計思想
 
@@ -21,6 +22,10 @@
 - **未検証を「問題なし」にしない**: 確認できなかった検証項目は「未検証」として明示的に報告する
 
 各 `write-*` スキルは完了条件として `review-docs` による検証を含む。
+
+ドキュメントの読者は二層に分ける: **エージェントは md（正典）を読み、人間は HTML（必要なら）を読む**。
+HTML はオプションの成果物で、作る場合は `write-html-docs` に従い md 正典からの生成物として扱う
+（手書きの二重管理をしない・最新性は検証ゲートで機械検査する）。
 
 ## インストール
 
@@ -63,6 +68,7 @@ Claude Code でプラグインとして導入した場合:
 /doc-authoring-skills-ja:write-adr
 /doc-authoring-skills-ja:write-agent-instructions
 /doc-authoring-skills-ja:write-project-docs
+/doc-authoring-skills-ja:write-html-docs
 /doc-authoring-skills-ja:review-docs
 ```
 
@@ -73,6 +79,22 @@ Claude Code でプラグインとして導入した場合:
 English version is available as: `doc-authoring-skills`
 
 ## 変更履歴
+
+### 2.1.0
+
+- 新スキル `write-html-docs` を追加: 人間向け HTML 資料（図付き概観・詳細仕様）を md 正典から
+  作る基準。二層構成（人間=HTML / エージェント=md）の原則、生成器の fail closed 要件、
+  生成物の非変更型最新性検査、図の作成基準（図は事実を主張する・SVG アクセシビリティ・
+  ライト/ダーク対応・生成ページへのフラグメント注入）を規定。**HTML 作成はオプション**で、
+  他スキルからは参照のみ
+- `write-project-docs`: 大きくなったドキュメントの分割手順（行範囲コピー + 逸失検証 +
+  互換アンカー索引）、実測記録・正典・橋渡しの 3 層分離パターン、エージェント向け参照文書の
+  「この文書で分かること」ブロック、役割分担表への HTML 資料（オプション）行を追加
+- `review-docs`: リンク・アンカー全数検証スクリプト `scripts/check-doc-links.py` を同梱し
+  検証項目を機械化。HTML 資料向けの検証項目（タグ整合・ライト/ダーク実表示・図中の事実主張の
+  突合・SVG アクセシビリティ）と、「新資料ではなく正典側が古い」ケースの扱い（実装を第三の
+  照合点にする）を追加
+- 全スキルのルーティング表に `write-html-docs` を追加
 
 ### 2.0.0
 
