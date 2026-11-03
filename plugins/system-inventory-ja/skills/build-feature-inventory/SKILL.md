@@ -22,18 +22,22 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 全コードを1つのエージェントに読ませると、コンテキストが溢れて詳細が落ち、記憶や名前からの推測で
 機能を書く（ハルシネーション）。これを次の仕組みで防ぐ。
 
-| 起きること | 防ぎ方 |
-|---|---|
-| 記憶で書く | 数千行のスライスごとに新しいサブエージェントが読む。オーケストレーターはコードを読まない |
-| 漏れに気づけない | スクリプトで作った分母（全ファイル・全入口）と照合し、網羅率を数値で出す |
-| 名前から推測する | すべての主張に `ファイル:行` と引用を付けさせ、スクリプトがその行に実在するか照合する |
-| 集約で話を盛る | 集約担当が書けるのは名前・要約・グループ分けだけ。入口・データ・根拠はスクリプトが引き継ぐ |
-| 抽出者の思い込み | 別エージェントがリスクの高い機能からサンプリングしてコードと突合する |
+| 起きること | 防ぎ方 | 機械で保証できる範囲 |
+|---|---|---|
+| 記憶で書く | 数千行のスライスごとに新しいサブエージェントが読む。オーケストレーターはコードを読まない | — |
+| 漏れに気づけない | スクリプトで作った分母（全ファイル・全入口）と照合し、網羅率を数値で出す | 分母内の網羅。除外したファイルの入口候補は警告する |
+| 読まずに書く | スクリプトが無作為に選んだ区間から1行ずつ引用させる（読了確認） | 指定区間の実在行を答えたこと |
+| 名前から推測する | すべての主張に `ファイル:行` と引用を付けさせ、その行に実在するか照合する | 引用文字列の実在（意味の正しさではない） |
+| 権限・制約を盛る | 利用者・制約は1件ずつ根拠行の番号を必須にする | 根拠行が示されていること |
+| 集約で話を盛る | 集約で書けるのは名前・グループ分け・利用者表記の写像だけ。単独の機能は局所要約をそのまま使う | 入口・データ・根拠・制約・確信度は改変不可 |
+| 意味の誤り・対象外への逃がし | 別エージェントがリスク順の抜き取りで機能と「対象外の入口」をコードと突合する | 抜き取りの範囲のみ（統計的） |
+
+**意味の正しさは機械では保証できない。** 独立検証の結果（誤り率）と、確信度・要確認事項を成果物に必ず残す。
 
 **オーケストレーターの境界:**
 
 - 自分で対象システムのコードを読まない（Phase 0 の構成把握と検出器の作成時を除く）
-- 抽出 JSON を自分で読まない。スクリプトの要約出力と `digest.txt` だけで判断する
+- 抽出 JSON を自分で読まない（Phase 1 のパイロットの品質確認を除く）。スクリプトの要約出力と `digest.txt` だけで判断する
 - 入口を手で列挙しない。必ず検出器を実行した結果を使う
 
 ## 役割分担
@@ -41,8 +45,8 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 | 担当 | 実行者 | 責任 |
 |---|---|---|
 | 進行・判断・グループ分け | オーケストレーター | 各 Phase の実行、ユーザーとの対話、grouping.json の作成 |
-| 抽出 | `inventory-extractor`（Sonnet） | 1スライスを読み extract/<S>.json を書く |
-| 独立検証 | `inventory-verifier`（Sonnet） | サンプル機能をコードと突合し review/<batch>.json を書く |
+| 抽出 | `inventory-extractor`（Sonnet、Read/Write のみ） | 1スライスを読み extract/<S>.json を書く |
+| 独立検証 | `inventory-verifier`（Sonnet） | 抜き取りの機能・対象外の入口をコードと突合し review/<batch>.json を書く |
 | 列挙・分割・検証・集約・出力 | 同梱スクリプト | 決定的な処理すべて |
 
 サブエージェントが使えない環境（プラグインのエージェントが未登録）では、`general-purpose` に
@@ -55,8 +59,7 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 - 作業ディレクトリ `W` は対象リポジトリの外に作る（既定: スクラッチパッド配下の `inventory-<システム名>/`）。
   中断しても `W` が残っていれば途中から再開できる
 - データ形式は `references/schema.md`、検出器の書き方は `references/detectors.md`
-
-以下、`SK=${CLAUDE_SKILL_DIR}`、対象リポジトリを `R` とする。
+- 以下、対象リポジトリを `R` とする
 
 ## Phase 0: 偵察と見積もり
 
@@ -64,20 +67,22 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
    ```
    python ${CLAUDE_SKILL_DIR}/scripts/build_file_manifest.py --repo R --work W
    ```
-   要約（役割別・拡張子別・ディレクトリ別の行数、除外理由）を読み、スタックと構成を判定する。
-   - 自動除外された 500 行超のファイルが本当に不要か確かめる（必要なら `--include`）
-   - CI 設定・開発ツール・サンプルコードなど機能でないものが大きければ `--exclude` を検討する
+   要約を読み、スタックと構成を判定する。特に次を確認する
+   - 「除外したディレクトリ」に業務コード（例: 取引先を意味する `vendor/`、`build/` という名の業務モジュール）が無いか。
+     あれば `--include '<glob>'` で戻す
+   - 「行数の多い対象ファイル」にシード・ダンプ・翻訳データ・フィクスチャがあれば `--exclude` を検討する
+   - git 未追跡のファイルが対象外になっている旨の警告があれば、ユーザーに確認する
    - モノレポで一部だけが対象なら `--subdir`
 2. 構成ファイル（`package.json`、`pyproject.toml` 等）とディレクトリ構成だけを見て、使っている
    フレームワークを特定する。コード本体は読まない
 3. 検出器を選ぶ。同梱: `fastapi` / `nextjs` / `python` / `data` / `generic`（主要フレームワーク・ファイルベースルーティング・cron）。
    同梱で拾えない入口の書き方があれば、`references/detectors.md` に従って `W/detectors/<名前>.yaml` を書く
-4. 入口分母を作る
+4. 入口分母を作る（**選んだ検出器だけ**を並べる。例は FastAPI + Next.js の場合）
    ```
-   python ${CLAUDE_SKILL_DIR}/scripts/enumerate_entrypoints.py --work W --detectors ${CLAUDE_SKILL_DIR}/detectors/*.yaml W/detectors/*.yaml
+   python ${CLAUDE_SKILL_DIR}/scripts/enumerate_entrypoints.py --work W --detectors ${CLAUDE_SKILL_DIR}/detectors/fastapi.yaml ${CLAUDE_SKILL_DIR}/detectors/nextjs.yaml ${CLAUDE_SKILL_DIR}/detectors/python.yaml ${CLAUDE_SKILL_DIR}/detectors/data.yaml
    ```
-   ルール別の件数を見て、主要な種別（API・画面・ジョブ）が 0 件なら検出器が合っていない。
-   代表的なものは `grep -c` 等の別手段で件数を突き合わせる
+   - 主要な種別（API・画面・ジョブ）が 0 件なら検出器が合っていない。代表的なものは `grep -c` 等の別手段で件数を突き合わせる
+   - 「除外したファイルの中に入口候補がある」警告が出たら、手順 1 に戻って除外を見直す
 5. スライスに分割して見積もる
    ```
    python ${CLAUDE_SKILL_DIR}/scripts/plan_slices.py --work W --max-lines 5000
@@ -92,9 +97,9 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 本実行の前に、典型的なスライス 2〜3 件（API 層・画面層・ドメイン層など性質の違うもの）だけを Phase 2〜3 の手順で処理する。
 
 - サブエージェントの完了通知にある使用トークンから「1行あたりトークン」を求め、
-  `plan_slices.py --tokens-per-line <実測値>` で全体の見積もりを出し直してユーザーに伝える
+  `plan_slices.py --dry-run --tokens-per-line <実測値>` で全体の見積もりを出し直してユーザーに伝える
 - 抽出結果の質を 1 スライス分だけ確認する（ここだけはオーケストレーターが extract JSON を読んでよい）。
-  機能の粒度・名前の付け方がずれていれば、依頼文に補足を足してから本実行する
+  機能の粒度・名前の付け方・対象外への振り分けがずれていれば、依頼文に補足を足してから本実行する
 - 見積もりが大きく変わったら、続行するかユーザーに確認する
 
 ## Phase 2: 抽出（並列）
@@ -107,7 +112,7 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
    依頼文は短く、可変部分を最後に置く（各エージェントで共通の前置きがキャッシュされる）:
    ```
    機能一覧の抽出。スキーマ: ${CLAUDE_SKILL_DIR}/references/schema.md
-   作業票: W/briefs/S007.md
+   作業票: W/briefs/S5bde43.md
    ```
 3. 完了通知は1行の要約だけを受け取る。抽出 JSON は読まない
 
@@ -119,49 +124,57 @@ python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W
 
 - 不合格のスライスがあれば `slice_brief.py --pending` を再実行する。不合格スライスの作業票は
   **修正モード**（エラー一覧だけ）になるので、同じく `inventory-extractor` に渡す。全文の再抽出はさせない
-- 同じスライスが 3 回不合格なら、エラー内容をユーザーに見せて判断を仰ぐ（スライスの分割・除外など）
+- verify が「3 回以上不合格」と出したスライスは、エラー内容をユーザーに見せて判断を仰ぐ（分割・除外など）
 - 全スライス合格後に網羅率を確認する
   ```
   python ${CLAUDE_SKILL_DIR}/scripts/check_coverage.py --work W
   ```
-  「分母に無かった入口の報告」が多い種別は検出器を直し、Phase 0-4 からやり直す
-  （内容が変わっていないスライスは抽出結果が引き継がれるので、再実行は差分だけになる）
+  - 「分母に無かった入口の報告」が多い種別は検出器を直し、Phase 0 の 4・5 からやり直す
+    （スライス ID は内容ハッシュ由来なので、中身が変わらないスライスの抽出・検証結果はそのまま有効）
+  - 「読まない役割のファイル内」の入口があれば、その役割を読む（`--skip-role` を変える）か、除外するかを決める
+  - 種別ごとの対象外率が高い（例: API の 3 割以上が対象外）なら、抽出の振り分けを疑う
 
 ## Phase 4: 集約
 
-1. ダイジェストを作る
+1. ダイジェストを作る（合格済みのスライスだけが載る）
    ```
    python ${CLAUDE_SKILL_DIR}/scripts/features.py digest --work W
    ```
    局所機能が 1,500 件を超えるなど一度に読めない量なら `--prefix <ディレクトリ>` で分けて作り、
-   ドメインごとに grouping を作ってから結合する
+   ドメインごとに grouping ファイルを分けて書く
 2. `W/digest.txt` だけを読み、`W/grouping.json` を書く（形式は `references/schema.md`）
    - ドメインは業務のまとまり（会員管理・受注・請求…）で切る。技術レイヤー（API・画面）では切らない
-   - 同じ業務操作の API 側と画面側の局所機能は、1つの機能にまとめる
-   - 要約は局所要約の統合にとどめる。局所要約に無い事実を足さない
-   - 利用者の表記はスライスごとに揺れる（「未ログインユーザー」「未ログインの利用者」等）。
-     システム全体で語彙を決め、各機能の `actors` に明示して統一する（省略すると局所の表記がそのまま並ぶ）
-3. マージする（配置漏れがあれば不合格になるので直して再実行）
+   - 同じ業務操作の API 側と画面側の局所機能は、1つの機能にまとめる（sources に両方）
+   - `actor_map` に digest 末尾の「局所の利用者表記」をすべて書き、統一語彙に写像する
+   - sources が1件の機能には summary を書かない（局所要約がそのまま使われる）
+   - sources が2件以上の機能の summary は局所要約の統合にとどめる。局所要約に無い事実を足さない
+3. マージする（配置漏れ・重複配置・actor_map 漏れがあれば不合格になるので直して再実行）
    ```
    python ${CLAUDE_SKILL_DIR}/scripts/features.py merge --work W --grouping W/grouping.json
    ```
 
 ## Phase 5: 独立検証
 
-1. 検証対象を抽出する（推定・不明、入口なし、多数の局所機能を束ねたものを優先し、残りは無作為）
+1. 検証対象のバッチを作る（推定・不明、入口なし、統合要約、制約ありの機能を優先し、残りは無作為。
+   対象外にした入口の抜き取りも含める）
    ```
-   python ${CLAUDE_SKILL_DIR}/scripts/features.py sample --work W --n 15
+   python ${CLAUDE_SKILL_DIR}/scripts/features.py sample --work W --n 15 --entries 10
    ```
    機能数が 200 を超える規模なら `--n` を全体の 5〜10% 程度に増やす
-2. `review-sample.json` を 5 件程度ずつに分け、`inventory-verifier` に渡す（出力先 `W/review/<batch>.json`）
-3. 検証担当の根拠も機械検証する
+2. `W/review-batches/` のバッチごとに `inventory-verifier` を起動する。依頼文はバッチファイルのパスとスキーマのパスだけ
+3. 検証担当の結果も機械検証する
    ```
-   python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W --review W/review/<batch>.json
+   python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W --review W/review/b01.json
    ```
-4. `partially_correct` / `incorrect` の機能は、元の局所機能のスライスを修正モードで直すか
-   grouping.json の要約を直し、merge からやり直す。直した後は誤りの傾向（例: 権限の例外を書き落とす）が
-   他の機能にもないか、同じ観点で追加サンプルを検証する
-5. 誤り率が高い（例: 20% 超）なら、抽出の依頼文を見直してから該当スライス群を再抽出する
+4. 指摘を元のスライスに差し戻す
+   ```
+   python ${CLAUDE_SKILL_DIR}/scripts/slice_brief.py --work W --from-review W/review/b01.json [W/review/b02.json ...]
+   ```
+   出力された修正票ごとに `inventory-extractor` を起動し、`verify_evidence.py` → `features.py merge` からやり直す。
+   統合要約の誤りなら grouping.json を直して merge する
+5. 誤りの傾向（例: 権限の例外を書き落とす）が見えたら、同じ観点で追加の抜き取りを行う。
+   `should_be_feature` が出たら、同じ理由コードの対象外入口を追加で検証する
+6. 誤り率が高い（例: 20% 超）なら、抽出の依頼文を見直してから該当スライス群を再抽出する
 
 ## Phase 6: 出力
 
@@ -178,7 +191,8 @@ python ${CLAUDE_SKILL_DIR}/scripts/render_inventory.py --work W [--out-dir <出�
 完了報告では次をユーザーに伝える。
 
 - 出力ファイルのパス
-- ファイル網羅率・入口の対応率・確信度の内訳・独立検証の結果（誤りがあった件数と直したか）
+- ファイル網羅率・入口の対応率・確信度の内訳
+- 独立検証の結果（機能・対象外の入口それぞれの誤り件数と、直したか）。抜き取りであり全件保証ではないこと
 - 読んでいない範囲（除外・対象外の役割）と、要確認事項の件数
 - 実際に使ったサブエージェント数と概算トークン
 
@@ -191,12 +205,12 @@ python ${CLAUDE_SKILL_DIR}/scripts/render_inventory.py --work W [--out-dir <出�
 | 生成物・ロック・minify・巨大データ・重複ファイルを除外 | 機能に関係ない行を読まない |
 | テストはアウトライン読み（テスト名・定義行のみ） | テストの行数の大半を読まずに、挙動の手がかりは残す |
 | ディレクトリ境界で詰めたスライス（既定 5,000 行） | 1体あたりの固定コスト（指示・スキーマの読み込み）を薄める |
-| パイロットで1行あたりトークンを実測 | 本実行前に総額を把握し、規模に応じて上限や除外を調整できる |
+| パイロットで1行あたりトークンを実測（実測例: 約 35/行） | 本実行前に総額を把握し、規模に応じて上限や除外を調整できる |
 | 抽出担当の応答は1行。結果はファイル渡し | 完了通知でオーケストレーターの文脈が膨らまない |
-| 不合格はエラー一覧だけを渡して修正 | スライスの全文再読を避ける |
-| 内容ハッシュが同じスライスは抽出結果を引き継ぐ | 検出器の修正後やコード更新後の再実行が差分だけで済む |
+| 不合格・検証指摘はエラー一覧だけを渡して修正（実測で初回の約半分） | スライスの全文再読を避ける |
+| スライス ID が内容ハッシュ由来 | 検出器の修正後・コード更新後も、中身が同じスライスは再抽出しない |
 | 集約は1行ダイジェストから | 全局所機能の JSON を読まずにグループ分けできる |
-| 独立検証はリスク順のサンプリング | 全件再検証のコストを払わずに誤りの傾向をつかむ |
+| 独立検証はリスク順の抜き取り | 全件再検証のコストを払わずに誤りの傾向をつかむ |
 
 さらに削る必要があるときの調整（ユーザーに確認してから行う）:
 
@@ -206,6 +220,7 @@ python ${CLAUDE_SKILL_DIR}/scripts/render_inventory.py --work W [--out-dir <出�
 
 ## コードが更新されたとき
 
-同じ `W` で Phase 0 の 1・4・5 を再実行する。内容が変わっていないスライスは抽出結果が引き継がれ、
-`slice_brief.py --pending` は変わったスライスだけを出す。以降は通常どおり Phase 2 から進める。
-集約（grouping.json）は既存のものを土台に、digest の差分を見て更新する。
+同じ `W` で Phase 0 の 1・4・5 を再実行する。中身が変わったスライスだけが新しい ID になり、
+`slice_brief.py --pending` はそれだけを出す（旧 ID の抽出結果は `extract/_stale/` に退避される）。
+以降は Phase 2 から進める。grouping.json の旧 ID は merge で「存在しない局所機能」として不合格になるので、
+digest を見て新しい ID に差し替える（取り違えは起きない）。

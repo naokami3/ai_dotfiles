@@ -76,14 +76,40 @@ def save_json(path, data):
         f.write("\n")
 
 
+ENCODINGS = ("utf-8", "cp932", "euc-jp")
+
+
+def decode_bytes(raw):
+    """(テキスト, エンコーディング) を返す。BOM を除き、utf-8 → cp932 → euc-jp の順に試す。"""
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    for enc in ENCODINGS:
+        try:
+            return raw.decode(enc), enc
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace"), "utf-8?"
+
+
+def split_lines(text):
+    """行分割は全スクリプトでこれに統一する。
+
+    str.splitlines() はフォームフィードや U+2028 等でも分割し、エディタ・Read ツールの
+    行番号とずれるため使わない。改行は \\n だけを区切りとし、行末の \\r は除く。
+    """
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return [l[:-1] if l.endswith("\r") else l for l in lines]
+
+
 def read_text(repo, path):
     with open(os.path.join(repo, path), "rb") as f:
-        raw = f.read()
-    return raw.decode("utf-8", errors="replace")
+        return decode_bytes(f.read())[0]
 
 
 def read_lines(repo, path):
-    return read_text(repo, path).splitlines()
+    return split_lines(read_text(repo, path))
 
 
 def sha1_bytes(data):
@@ -106,6 +132,25 @@ def work_paths(work):
         "coverage": os.path.join(work, "coverage.json"),
         "features": os.path.join(work, "features.json"),
     }
+
+
+def load_reviews(wp, keys):
+    """独立検証の結果を読む。features.json に存在する feature_key を指すものだけを有効とする。
+
+    返り値: (機能の結果 {key: r}, 対象外の入口の結果 {entry_id: r}, 無視した古い結果の件数)
+    """
+    import glob
+    feats, ents, stale = {}, {}, 0
+    for rp in sorted(glob.glob(os.path.join(wp["review_dir"], "*.json"))):
+        d = load_json(rp)
+        for r in d.get("results", []):
+            if r.get("feature_key") in keys:
+                feats[r["feature_key"]] = r
+            else:
+                stale += 1
+        for r in d.get("entry_results", []):
+            ents[r.get("entry_id")] = r
+    return feats, ents, stale
 
 
 def die(msg, code=2):

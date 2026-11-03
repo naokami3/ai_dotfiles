@@ -23,6 +23,17 @@ rules:
       - ['\([^/)]*\)/', '']
       - ['(.)/$', '\1']
 
+  # export { handler as GET, handler as POST }（NextAuth 等の定番）
+  - id: next-app-route-reexport
+    kind: http_endpoint
+    files: ["**/app/**/route.{ts,js,tsx,jsx}"]
+    path_pattern: '(?:^|/)app/(?P<route>(?:[^/]+/)*?)route\.(?:ts|js|tsx|jsx)$'
+    pattern: '\bas\s+(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b'
+    label: "{method} /{route}"
+    normalize:
+      - ['\([^/)]*\)/', '']
+      - ['(.)/$', '\1']
+
   - id: next-pages-page
     kind: ui_route
     files: ["**/pages/**/*.{tsx,jsx,ts,js,mdx}"]

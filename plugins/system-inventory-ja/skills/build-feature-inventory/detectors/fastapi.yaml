@@ -6,8 +6,9 @@ rules:
   - id: fastapi-route
     kind: http_endpoint
     files: ["**/*.py"]
-    pattern: '^[ \t]*@(?P<obj>\w+)\.(?P<method>get|post|put|patch|delete|head|options|api_route)\(\s*(?:path\s*=\s*)?[rf]?["''](?P<path>[^"'']*)["'']'
-    label: "{method|upper} {path} ({obj})"
+    # パスは文字列リテラル・定数（@router.get(ITEMS_PATH)）・省略のいずれでも拾う
+    pattern: '^[ \t]*@(?P<obj>\w+)\.(?P<method>get|post|put|patch|delete|head|options|api_route)\(\s*(?:path\s*=\s*)?(?:[rf]?["''](?P<path>[^"'']*)["'']|(?P<const>[A-Za-z_][\w.]*))?'
+    label: "{method|upper} {path}{const} ({obj})"
 
   - id: fastapi-websocket
     kind: http_endpoint

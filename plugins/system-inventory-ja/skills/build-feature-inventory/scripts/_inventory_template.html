@@ -119,7 +119,11 @@ function detail(f){
   const ev = f.evidence.map(e => `<div><code>${esc(e.path)}:${e.line}</code> — <code>${esc(e.quote)}</code></div>`).join('');
   const en = f.entries.map(e => `<div><span class="chip">${esc(KIND[e.kind] || e.kind)}</span> <code>${esc(e.label)}</code></div>`).join('') || 'なし';
   const qs = f.open_questions.map(q => `<div class="q">・${esc(q)}</div>`).join('');
+  const cons = (f.constraint_texts || []).map(c => `<div>・${esc(c)}</div>`).join('');
+  const locals = (f.local_summaries || []).length > 1 ? f.local_summaries.map(x => `<div><code>${esc(x.local_id)}</code> ${esc(x.summary)}</div>`).join('') : '';
   return `<dl><dt>概要</dt><dd>${esc(f.summary)}</dd>
+    ${cons ? `<dt>制約（根拠）</dt><dd>${cons}</dd>` : ''}
+    ${locals ? `<dt>元の局所要約</dt><dd>${locals}</dd>` : ''}
     <dt>入口</dt><dd>${en}</dd>
     ${f.data.length ? `<dt>データ</dt><dd>${f.data.map(x => `<code>${esc(x)}</code>`).join(', ')}</dd>` : ''}
     ${f.external.length ? `<dt>外部連携</dt><dd>${esc(f.external.join(', '))}</dd>` : ''}

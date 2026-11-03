@@ -3,14 +3,15 @@
 
 作業票の内容:
 - 全文を読むファイルと行範囲（抽出担当が Read ツールで読む）
+- 読了確認の窓（各窓から1行ずつ引用させる。スクリプトが決めた区間なので、読まずには答えにくい）
 - アウトライン読みのファイルは、定義行・テスト名だけをここで展開済み（Read 不要）
 - このスライスに割り当てられた入口（すべて features か unmapped_entries に対応付ける）
-- 前回の検証で不合格だった場合は、そのエラー一覧（修正モード）
+- 修正モード: 前回の機械検証のエラー、または独立検証の指摘
 
 使い方:
-    python3 slice_brief.py --work W --pending        # 未合格の全スライスの作業票を W/briefs/ に書く
-    python3 slice_brief.py --work W --slice S001     # 1件を標準出力に出す（確認用）
---pending は書き出したスライス ID を「未抽出」「修正モード」に分けて出力する。
+    python3 slice_brief.py --work W --pending            # 未合格の全スライスの作業票を W/briefs/ に書く
+    python3 slice_brief.py --work W --from-review W/review/b1.json   # 独立検証の指摘から修正票を書く
+    python3 slice_brief.py --work W --slice S1a2b3c      # 1件を標準出力に出す（確認用）
 """
 import argparse
 import os
@@ -20,25 +21,35 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _common import die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
 
 
-def brief(wp, repo, s, entries):
+def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
     L = [f"# スライス {s['id']}", "",
          f"- slice_id: {s['id']}", f"- slice_hash: {s['hash']}", f"- リポジトリ: {repo}",
          f"- 出力先: {os.path.join(wp['extract_dir'], s['id'] + '.json')}", ""]
-    vf = os.path.join(wp["verify_dir"], f"{s['id']}.json")
-    fix = None
-    if os.path.exists(vf):
-        v = load_json(vf)
-        if not v.get("ok") and not v.get("missing"):
-            fix = v.get("errors", [])
-    if fix:
-        L += ["## 修正モード", "",
-              "前回の出力は検証で不合格だった。出力先の既存ファイルを読み、以下のエラーだけを直す。",
-              "コードの再読は、エラーの箇所を確かめるのに必要な範囲だけにする。", ""]
-        L += [f"- {e}" for e in fix] + [""]
+    if fix_errors:
+        L += ["## 修正モード（機械検証の不合格）", "",
+              "出力先の既存ファイルを読み、以下のエラーだけを直す。コードの再読はエラーの確認に必要な範囲だけにする。",
+              "既存の local_id を別の機能に使い回さない（機能を消したら番号は欠番のまま、新しい機能は新しい番号）。", ""]
+        L += [f"- {e}" for e in fix_errors] + [""]
+    if review_notes:
+        L += ["## 修正モード（独立検証の指摘）", "",
+              "別の検証担当がコードと突合して、以下の局所機能の記述に誤りを見つけた。指摘の根拠の行を自分で読んで確かめ、",
+              "正しければ該当の局所機能を直す（要約・actors・constraints・evidence）。指摘が誤りなら直さず notes に理由を書く。",
+              "既存の local_id を別の機能に使い回さない。", ""]
+        for n in review_notes:
+            L.append(f"- 対象: {', '.join(n['local_ids'])}（{n['verdict']}）: {n['comment']}")
+            for ev in n.get("evidence", []):
+                L.append(f"  - 根拠: {ev['path']}:{ev['line']} `{ev['quote']}`")
+        L.append("")
     full = [i for i in s["items"] if i["mode"] == "full"]
     outl = [i for i in s["items"] if i["mode"] == "outline"]
-    L += [f"## 全文を読むファイル（{len(full)} 件）", ""]
+    L += [f"## 全文を読むファイル（{len(full)} 件）", "",
+          "Read は 1 回あたり 2000 行までしか返らない。それを超える範囲は offset / limit で分けて読む。", ""]
     L += [f"- {i['path']} L{i['start']}-{i['end']}" for i in full] + [""]
+    checks = s.get("read_checks", [])
+    if checks:
+        L += [f"## 読了確認（{len(checks)} 件）", "",
+              "各区間から、10 文字以上ある行を1行選び、`read_checks` に path・line・quote（その行の文字列をそのまま）で書く。", ""]
+        L += [f"- {c['path']} L{c['start']}-{c['end']}" for c in checks] + [""]
     if outl:
         L += [f"## アウトライン読みのファイル（{len(outl)} 件）", "",
               "以下が内容の要約（定義行・テスト名）。挙動を確かめたい箇所だけ Read してよい。", ""]
@@ -49,8 +60,15 @@ def brief(wp, repo, s, entries):
     L += [f"## このスライスの入口（{len(s['entry_ids'])} 件。全件を対応付ける）", ""]
     for eid in s["entry_ids"]:
         e = entries.get(eid, {})
-        L.append(f"- `{eid}` [{e.get('kind')}] {e.get('label')}")
-    return "\n".join(L) + "\n", bool(fix)
+        note = f"（{e['dup_of']} と同一内容）" if e.get("dup_of") else ""
+        L.append(f"- `{eid}` [{e.get('kind')}] {e.get('label')}{note}")
+    return "\n".join(L) + "\n"
+
+
+def write(bdir, sid, text):
+    os.makedirs(bdir, exist_ok=True)
+    with open(os.path.join(bdir, f"{sid}.md"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
 
 
 def main():
@@ -59,32 +77,59 @@ def main():
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--slice")
     g.add_argument("--pending", action="store_true")
+    g.add_argument("--from-review", nargs="+")
     a = ap.parse_args()
 
     wp = work_paths(a.work)
     repo = load_json(wp["files"])["repo"]
     slices = load_json(wp["slices"])["slices"]
+    by_id = {s["id"]: s for s in slices}
     entries = {e["id"]: e for e in load_json(wp["inventory"])["entries"]} \
         if os.path.exists(wp["inventory"]) else {}
+    bdir = os.path.join(a.work, "briefs")
 
     if a.slice:
-        s = next((x for x in slices if x["id"] == a.slice), None) or die(f"スライス {a.slice} が無い")
-        print(brief(wp, repo, s, entries)[0], end="")
+        s = by_id.get(a.slice) or die(f"スライス {a.slice} が無い")
+        print(brief(wp, repo, s, entries), end="")
         return
 
-    bdir = os.path.join(a.work, "briefs")
-    os.makedirs(bdir, exist_ok=True)
+    if a.from_review:
+        feats = {f["key"]: f for d in load_json(wp["features"])["domains"] for f in d["features"]}
+        notes = {}
+        stale = 0
+        for rp in a.from_review:
+            for r in load_json(rp).get("results", []):
+                if r.get("verdict") not in ("partially_correct", "incorrect"):
+                    continue
+                f = feats.get(r.get("feature_key"))
+                if not f:
+                    stale += 1
+                    continue
+                for lid in f["sources"]:
+                    sid = lid.rsplit("-F", 1)[0]
+                    if sid in by_id:
+                        notes.setdefault(sid, []).append({"local_ids": [x for x in f["sources"] if x.startswith(sid + "-")],
+                                                          "verdict": r["verdict"], "comment": r.get("comment", ""),
+                                                          "evidence": r.get("evidence", [])})
+        for sid, ns in notes.items():
+            uniq = {(n["comment"], tuple(n["local_ids"])): n for n in ns}.values()
+            write(bdir, sid, brief(wp, repo, by_id[sid], entries, review_notes=list(uniq)))
+        print(f"修正票を出力: {bdir}（{len(notes)} スライス: {' '.join(notes)}）")
+        if stale:
+            print(f"※ features.json に存在しない feature_key の指摘 {stale} 件は無視した（merge し直した後の古い検証結果）")
+        return
+
     new, fixes = [], []
     for s in slices:
         vf = os.path.join(wp["verify_dir"], f"{s['id']}.json")
-        if os.path.exists(vf) and load_json(vf).get("ok"):
+        v = load_json(vf) if os.path.exists(vf) else None
+        if v and v.get("ok"):
             continue
-        if os.path.exists(os.path.join(wp["extract_dir"], f"{s['id']}.json")) and not os.path.exists(vf):
+        if os.path.exists(os.path.join(wp["extract_dir"], f"{s['id']}.json")) and not v:
             continue  # 抽出済み・未検証。先に verify_evidence.py を実行する
-        text, is_fix = brief(wp, repo, s, entries)
-        with open(os.path.join(bdir, f"{s['id']}.md"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
-        (fixes if is_fix else new).append(s["id"])
+        errs = v.get("errors") if v and not v.get("missing") else None
+        write(bdir, s["id"], brief(wp, repo, s, entries, fix_errors=errs))
+        (fixes if errs else new).append(s["id"])
     print(f"作業票を出力: {bdir}")
     print(f"未抽出 {len(new)}: {' '.join(new)}")
     print(f"修正モード {len(fixes)}: {' '.join(fixes)}")

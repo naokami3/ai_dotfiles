@@ -2,10 +2,12 @@
 # スタックが不明なときの初手として使う。0 件のルールは無視してよい。
 name: generic
 rules:
+  # `api.get("/x")` のような HTTP クライアント呼び出しを拾わないよう、サーバー側の慣用名に限る
   - id: express-like-route
     kind: http_endpoint
     files: ["**/*.{js,ts,mjs,cjs}"]
-    pattern: '\b(?P<obj>app|router|server|api|route)\.(?P<method>get|post|put|patch|delete|all)\(\s*["''`](?P<path>/[^"''`]*)'
+    exclude: ["**/*.{tsx,jsx}", "**/components/**", "**/hooks/**", "**/client/**"]
+    pattern: '\b(?P<obj>app|router|server)\.(?P<method>get|post|put|patch|delete|all)\(\s*["''`](?P<path>/[^"''`]*)["''`]\s*,'
     label: "{method|upper} {path} ({obj})"
 
   - id: nestjs-route
