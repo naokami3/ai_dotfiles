@@ -1,0 +1,52 @@
+# Next.js（App Router / Pages Router）の入口検出器
+# ファイルシステムルーティングなので、ファイルパスから URL を組み立てる。
+# ルートグループ (group)・並列ルート @slot は URL に現れないので取り除く。
+name: nextjs
+rules:
+  - id: next-app-page
+    kind: ui_route
+    files: ["**/app/**/page.{tsx,jsx,ts,js,mdx}", "**/app/page.{tsx,jsx,ts,js,mdx}"]
+    path_pattern: '(?:^|/)app/(?P<route>(?:[^/]+/)*?)page\.(?:tsx|jsx|ts|js|mdx)$'
+    label: "/{route}"
+    normalize:
+      - ['\([^/)]*\)/', '']
+      - ['@[^/]+/', '']
+      - ['(.)/$', '\1']
+
+  - id: next-app-route-handler
+    kind: http_endpoint
+    files: ["**/app/**/route.{ts,js,tsx,jsx}"]
+    path_pattern: '(?:^|/)app/(?P<route>(?:[^/]+/)*?)route\.(?:ts|js|tsx|jsx)$'
+    pattern: '^export\s+(?:async\s+)?(?:function\s+|const\s+)(?P<method>GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b'
+    label: "{method} /{route}"
+    normalize:
+      - ['\([^/)]*\)/', '']
+      - ['(.)/$', '\1']
+
+  - id: next-pages-page
+    kind: ui_route
+    files: ["**/pages/**/*.{tsx,jsx,ts,js,mdx}"]
+    path_pattern: '(?:^|/)pages/(?P<route>(?!api/)(?!_app\.)(?!_document\.)(?!_error\.)(?:[^/]+/)*[^/]+?)\.(?:tsx|jsx|ts|js|mdx)$'
+    label: "/{route}"
+    normalize:
+      - ['/index$', '']
+      - ['^$', '/']
+
+  - id: next-pages-api
+    kind: http_endpoint
+    files: ["**/pages/api/**/*.{ts,js}"]
+    path_pattern: '(?:^|/)pages/api/(?P<route>.+?)\.(?:ts|js)$'
+    label: "API /api/{route}"
+    normalize:
+      - ['/index$', '']
+
+  - id: next-server-action
+    kind: rpc_method
+    files: ["**/*.{ts,tsx,js,jsx}"]
+    pattern: '^[ \t]*["'']use server["'']'
+    label: "Server Actions ({file})"
+
+  - id: next-middleware
+    kind: other
+    path_pattern: '(?:^|/)(?:src/)?middleware\.(?:ts|js)$'
+    label: "middleware ({file})"

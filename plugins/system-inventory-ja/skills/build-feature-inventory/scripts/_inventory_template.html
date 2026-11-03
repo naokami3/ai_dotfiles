@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>機能一覧 — __TITLE__</title>
+<style>
+:root{
+  --bg:#f7f7f5;--panel:#ffffff;--ink:#1d1f23;--muted:#62666d;--line:#e3e3df;--accent:#2f5d9e;
+  --ok:#2e7d4f;--warn:#a86a00;--bad:#b3372f;--chip:#eef1f6;--row:#fafaf8;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#16181b;--panel:#1e2125;--ink:#e6e6e3;--muted:#9a9ea5;--line:#30343a;--accent:#7fa7e0;
+  --ok:#6cc08f;--warn:#e0a84a;--bad:#e5766d;--chip:#262b33;--row:#1a1d20;color-scheme:dark;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif}
+.wrap{max-width:1400px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:16px;word-break:break-all}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;color:var(--muted);font-size:13px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px;flex-wrap:wrap}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;color:var(--muted);font:inherit;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--accent);font-weight:600}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.bar input,.bar select{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+.bar input{flex:1;min-width:200px}
+.count{color:var(--muted);font-size:12px;align-self:center}
+.tw{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:var(--panel);font-size:12px;color:var(--muted);font-weight:600;cursor:pointer;white-space:nowrap}
+tr.f{cursor:pointer}tr.f:hover td{background:var(--row)}
+tr.dom td{background:var(--chip);font-weight:600}
+td.id{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:nowrap;color:var(--muted)}
+.c{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;white-space:nowrap;border:1px solid currentColor}
+.c.confirmed{color:var(--ok)}.c.inferred{color:var(--warn)}.c.unknown{color:var(--bad)}
+.chip{display:inline-block;background:var(--chip);border-radius:4px;padding:0 6px;margin:1px 2px;font-size:12px}
+.detail td{background:var(--row);padding:12px 18px}
+.detail dl{display:grid;grid-template-columns:110px 1fr;gap:4px 12px;margin:0}
+.detail dt{color:var(--muted);font-size:12px}
+.detail dd{margin:0}
+code{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-all}
+.q{color:var(--warn)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title"></h1>
+  <div class="sub" id="sub"></div>
+  <div class="note">正典は <code>features.json</code>。根拠（ファイル:行）は機械検証済みの引用にもとづく。確信度「推定」「不明」と「要確認」は、コードだけでは断定できなかった点であり人間による確認が必要。行をクリックすると詳細を表示する。</div>
+  <div class="stats" id="stats"></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="features" aria-selected="true">機能</button>
+    <button role="tab" data-tab="entries" aria-selected="false">入口</button>
+    <button role="tab" data-tab="questions" aria-selected="false">要確認</button>
+    <button role="tab" data-tab="coverage" aria-selected="false">網羅・対象外</button>
+  </div>
+
+  <section id="tab-features">
+    <div class="bar">
+      <input id="q" type="search" placeholder="機能名・概要・入口・データで検索">
+      <select id="fdom"><option value="">すべてのドメイン</option></select>
+      <select id="fconf"><option value="">すべての確信度</option><option value="confirmed">確認済み</option><option value="inferred">推定</option><option value="unknown">不明</option></select>
+      <select id="fent"><option value="">入口: すべて</option><option value="yes">入口あり</option><option value="no">入口なし</option></select>
+      <span class="count" id="fcount"></span>
+    </div>
+    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>概要</th><th>利用者</th><th>入口</th><th>データ</th><th>確信度</th></tr></thead><tbody id="ftb"></tbody></table></div>
+  </section>
+
+  <section id="tab-entries" hidden>
+    <div class="bar">
+      <input id="eq" type="search" placeholder="入口・ファイル・機能名で検索">
+      <select id="ekind"><option value="">すべての種別</option></select>
+      <select id="emap"><option value="">すべて</option><option value="mapped">機能に対応</option><option value="unmapped">未分類</option></select>
+      <span class="count" id="ecount"></span>
+    </div>
+    <div class="tw"><table><thead><tr><th>種別</th><th>入口</th><th>場所</th><th>機能</th></tr></thead><tbody id="etb"></tbody></table></div>
+  </section>
+
+  <section id="tab-questions" hidden>
+    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>要確認事項</th></tr></thead><tbody id="qtb"></tbody></table></div>
+  </section>
+
+  <section id="tab-coverage" hidden>
+    <div class="tw"><table><thead><tr><th>項目</th><th>値</th></tr></thead><tbody id="ctb"></tbody></table></div>
+  </section>
+</div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+(function(){
+const D = JSON.parse(document.getElementById('data').textContent);
+const CONF = {confirmed:'確認済み', inferred:'推定', unknown:'不明'};
+const KIND = D.kindLabels;
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+$('title').textContent = '機能一覧: ' + D.system.name;
+document.title = '機能一覧 — ' + D.system.name;
+$('sub').textContent = D.system.repo + (D.system.commit ? ' @ ' + D.system.commit.slice(0, 12) : '') + ' ・ 生成 ' + D.system.generated_at;
+$('stats').innerHTML = D.stats.map(s => `<div class="stat"><b>${esc(s[1])}</b><span>${esc(s[0])}</span></div>`).join('');
+
+// タブ
+document.querySelectorAll('[role=tab]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[role=tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+  document.querySelectorAll('section[id^=tab-]').forEach(s => s.hidden = s.id !== 'tab-' + b.dataset.tab);
+}));
+
+// 機能
+D.domains.forEach(d => $('fdom').insertAdjacentHTML('beforeend', `<option value="${esc(d.id)}">${esc(d.id + ' ' + d.name)}</option>`));
+const open = new Set();
+function featText(f){ return [f.id, f.name, f.summary, f.actors.join(' '), f.entries.map(e => e.label).join(' '), f.data.join(' '), f.external.join(' ')].join(' ').toLowerCase(); }
+function detail(f){
+  const ev = f.evidence.map(e => `<div><code>${esc(e.path)}:${e.line}</code> — <code>${esc(e.quote)}</code></div>`).join('');
+  const en = f.entries.map(e => `<div><span class="chip">${esc(KIND[e.kind] || e.kind)}</span> <code>${esc(e.label)}</code></div>`).join('') || 'なし';
+  const qs = f.open_questions.map(q => `<div class="q">・${esc(q)}</div>`).join('');
+  return `<dl><dt>概要</dt><dd>${esc(f.summary)}</dd>
+    <dt>入口</dt><dd>${en}</dd>
+    ${f.data.length ? `<dt>データ</dt><dd>${f.data.map(x => `<code>${esc(x)}</code>`).join(', ')}</dd>` : ''}
+    ${f.external.length ? `<dt>外部連携</dt><dd>${esc(f.external.join(', '))}</dd>` : ''}
+    <dt>根拠</dt><dd>${ev}</dd>
+    ${qs ? `<dt>要確認</dt><dd>${qs}</dd>` : ''}
+    ${f.review ? `<dt>独立検証</dt><dd>${esc(f.review)}</dd>` : ''}
+    <dt>元の抽出</dt><dd><code>${esc(f.sources.join(' '))}</code></dd></dl>`;
+}
+function renderF(){
+  const q = $('q').value.trim().toLowerCase(), dom = $('fdom').value, conf = $('fconf').value, ent = $('fent').value;
+  let html = '', n = 0;
+  D.domains.forEach(d => {
+    if (dom && d.id !== dom) return;
+    const fs = d.features.filter(f => (!conf || f.confidence === conf) && (!ent || (ent === 'yes') === (f.entries.length > 0)) && (!q || featText(f).includes(q)));
+    if (!fs.length) return;
+    html += `<tr class="dom"><td colspan="7">${esc(d.id)} ${esc(d.name)} <span style="font-weight:400;color:var(--muted)">— ${esc(d.summary)}（${fs.length}）</span></td></tr>`;
+    fs.forEach(f => {
+      n++;
+      const kinds = {}; f.entries.forEach(e => { const k = KIND[e.kind] || e.kind; kinds[k] = (kinds[k] || 0) + 1; });
+      html += `<tr class="f" data-id="${esc(f.id)}"><td class="id">${esc(f.id)}</td><td><b>${esc(f.name)}</b></td><td>${esc(f.summary)}</td>
+        <td>${esc(f.actors.join(', '))}</td><td>${Object.entries(kinds).map(([k, v]) => `<span class="chip">${esc(k)} ${v}</span>`).join('') || '<span class="c unknown">なし</span>'}</td>
+        <td>${f.data.slice(0, 4).map(x => `<span class="chip">${esc(x)}</span>`).join('')}${f.data.length > 4 ? ' …' : ''}</td>
+        <td><span class="c ${esc(f.confidence)}">${CONF[f.confidence] || esc(f.confidence)}</span></td></tr>`;
+      if (open.has(f.id)) html += `<tr class="detail"><td colspan="7">${detail(f)}</td></tr>`;
+    });
+  });
+  $('ftb').innerHTML = html || '<tr><td colspan="7">該当なし</td></tr>';
+  $('fcount').textContent = n + ' 件';
+}
+$('ftb').addEventListener('click', e => { const tr = e.target.closest('tr.f'); if (!tr) return; const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); renderF(); });
+['q', 'fdom', 'fconf', 'fent'].forEach(id => $(id).addEventListener('input', renderF));
+
+// 入口
+[...new Set(D.entries.map(e => e.kind))].forEach(k => $('ekind').insertAdjacentHTML('beforeend', `<option value="${esc(k)}">${esc(KIND[k] || k)}</option>`));
+function renderE(){
+  const q = $('eq').value.trim().toLowerCase(), k = $('ekind').value, m = $('emap').value;
+  const rows = D.entries.filter(e => (!k || e.kind === k) && (!m || (m === 'mapped') === !!e.features.length) &&
+    (!q || [e.label, e.path, e.features.map(f => f.id + ' ' + f.name).join(' '), e.reason].join(' ').toLowerCase().includes(q)));
+  $('etb').innerHTML = rows.map(e => `<tr><td><span class="chip">${esc(KIND[e.kind] || e.kind)}</span></td><td><code>${esc(e.label)}</code></td>
+    <td><code>${esc(e.path)}:${e.line}</code></td>
+    <td>${e.features.length ? e.features.map(f => `${esc(f.id)} ${esc(f.name)}`).join('<br>') : `<span class="q">未分類: ${esc(e.reason)}</span>`}</td></tr>`).join('') || '<tr><td colspan="4">該当なし</td></tr>';
+  $('ecount').textContent = rows.length + ' 件';
+}
+['eq', 'ekind', 'emap'].forEach(id => $(id).addEventListener('input', renderE));
+
+$('qtb').innerHTML = D.questions.map(r => `<tr><td class="id">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="q">${esc(r[2])}</td></tr>`).join('') || '<tr><td colspan="3">なし</td></tr>';
+$('ctb').innerHTML = D.overview.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('');
+renderF(); renderE();
+})();
+</script>
+</body>
+</html>

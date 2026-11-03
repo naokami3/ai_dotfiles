@@ -47,6 +47,13 @@
       "category": "development",
       "source": "./plugins/pattern-radar",
       "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/pattern-radar"
+    },
+    {
+      "name": "system-inventory-ja",
+      "description": "1つのシステムのコード全体から機能一覧（Excel / HTML / md）を作る。機械的な分母（全ファイル・全入口）との照合、引用の機械検証、独立検証でハルシネーションと漏れを抑える。言語非依存・大規模対応。",
+      "category": "development",
+      "source": "./plugins/system-inventory-ja",
+      "homepage": "https://github.com/naokami3/ai_dotfiles/tree/main/plugins/system-inventory-ja"
     }
   ]
 }

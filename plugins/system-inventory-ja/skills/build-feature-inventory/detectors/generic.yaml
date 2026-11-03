@@ -1,0 +1,112 @@
+# 汎用の入口検出器（主要な Web フレームワークのルート記法・定期実行・メッセージ購読）
+# スタックが不明なときの初手として使う。0 件のルールは無視してよい。
+name: generic
+rules:
+  - id: express-like-route
+    kind: http_endpoint
+    files: ["**/*.{js,ts,mjs,cjs}"]
+    pattern: '\b(?P<obj>app|router|server|api|route)\.(?P<method>get|post|put|patch|delete|all)\(\s*["''`](?P<path>/[^"''`]*)'
+    label: "{method|upper} {path} ({obj})"
+
+  - id: nestjs-route
+    kind: http_endpoint
+    files: ["**/*.ts"]
+    pattern: '@(?P<method>Get|Post|Put|Patch|Delete|All)\(\s*["'']?(?P<path>[^"'')]*)'
+    label: "{method|upper} {path}"
+
+  - id: spring-mapping
+    kind: http_endpoint
+    files: ["**/*.{java,kt}"]
+    pattern: '@(?P<method>Get|Post|Put|Patch|Delete|Request)Mapping\(\s*(?:value\s*=\s*|path\s*=\s*)?\{?\s*"(?P<path>[^"]*)"'
+    label: "{method|upper} {path}"
+
+  - id: aspnet-route
+    kind: http_endpoint
+    files: ["**/*.cs"]
+    pattern: '\[Http(?P<method>Get|Post|Put|Patch|Delete)(?:\(\s*"(?P<path>[^"]*)"\s*\))?\]'
+    label: "{method|upper} {path}"
+
+  - id: go-http-route
+    kind: http_endpoint
+    files: ["**/*.go"]
+    pattern: '\.(?:(?P<method>GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)|HandleFunc|Handle)\(\s*"(?P<path>/[^"]*)"'
+    label: "{method|upper} {path}"
+
+  - id: rails-route
+    kind: http_endpoint
+    files: ["**/config/routes.rb", "**/config/routes/*.rb"]
+    pattern: '^[ \t]*(?P<method>get|post|put|patch|delete|resources|resource|match)\s+[:"''](?P<path>[\w/:.-]+)'
+    label: "{method} {path}"
+
+  - id: laravel-route
+    kind: http_endpoint
+    files: ["**/routes/*.php"]
+    pattern: 'Route::(?P<method>get|post|put|patch|delete|any|resource|apiResource)\(\s*["''](?P<path>[^"'']*)'
+    label: "{method|upper} {path}"
+
+  # ファイルベースルーティング（TanStack Router / Remix / React Router v7 の routes/ ディレクトリ）
+  # `_` 始まりのセグメントはレイアウト（URL に現れない）、`__root` はルートレイアウト
+  - id: file-routes-dir
+    kind: ui_route
+    files: ["**/routes/**/*.{tsx,jsx}"]
+    path_pattern: '(?:^|/)routes/(?P<route>(?!__root\.)(?:[^/]+/)*[^/]+?)\.(?:tsx|jsx)$'
+    label: "/{route}"
+    normalize:
+      - ['(^|/)_[^/.]+(?=/|$)', '']
+      - ['/index$', '']
+      - ['^/*', '/']
+      - ['\.', '/']
+
+  - id: sveltekit-page
+    kind: ui_route
+    files: ["**/routes/**/+page.svelte"]
+    path_pattern: '(?:^|/)routes/(?P<route>(?:[^/]+/)*?)\+page\.svelte$'
+    label: "/{route}"
+    normalize:
+      - ['\([^/)]*\)/', '']
+      - ['(.)/$', '\1']
+
+  - id: nuxt-page
+    kind: ui_route
+    files: ["**/pages/**/*.vue"]
+    path_pattern: '(?:^|/)pages/(?P<route>(?:[^/]+/)*[^/]+?)\.vue$'
+    label: "/{route}"
+    normalize:
+      - ['/index$', '']
+      - ['^index$', '']
+
+  - id: graphql-root-field
+    kind: graphql_operation
+    files: ["**/*.{graphql,gql}"]
+    pattern: '^type\s+(?P<op>Query|Mutation|Subscription)\b'
+    label: "GraphQL {op} ({file})"
+
+  - id: github-actions-cron
+    kind: scheduled_job
+    files: [".github/workflows/*.{yml,yaml}"]
+    pattern: '-\s*cron:\s*["''](?P<cron>[^"'']+)'
+    label: "cron {cron} ({file})"
+
+  - id: k8s-cronjob
+    kind: scheduled_job
+    files: ["**/*.{yml,yaml}"]
+    pattern: '^kind:\s*CronJob\b'
+    label: "CronJob ({file})"
+
+  - id: crontab-file
+    kind: scheduled_job
+    files: ["**/crontab*", "**/*.cron"]
+    pattern: '^(?P<cron>(?:[\d*/,-]+\s+){4}[\d*/,-]+)\s+(?P<cmd>.+)$'
+    label: "cron {cron} {cmd}"
+
+  - id: vercel-cron
+    kind: scheduled_job
+    files: ["**/vercel.json"]
+    pattern: '"path"\s*:\s*"(?P<path>[^"]+)"\s*,\s*"schedule"\s*:\s*"(?P<cron>[^"]+)"'
+    label: "cron {cron} {path}"
+
+  - id: jvm-message-listener
+    kind: event_consumer
+    files: ["**/*.{java,kt}"]
+    pattern: '@(?P<kind>Kafka|Rabbit|Sqs|Jms)Listener\b[^\n]*'
+    label: "{kind}Listener ({file})"

@@ -1,0 +1,45 @@
+# データ定義（言語横断）: SQL・マイグレーション・スキーマ定義ファイル
+# ORM モデルと重複して数えることがあるが、どちらも同じ機能に紐付ければよい。
+name: data
+rules:
+  - id: sql-create-table
+    kind: data_entity
+    files: ["**/*.sql"]
+    pattern: '(?i)\bcreate\s+table\s+(?:if\s+not\s+exists\s+)?[`"\[]?(?P<table>[\w.]+)'
+    label: "table {table}"
+
+  - id: alembic-create-table
+    kind: data_entity
+    files: ["**/*.py"]
+    pattern: '\bop\.create_table\(\s*["''](?P<table>\w+)'
+    label: "table {table} (migration)"
+
+  - id: prisma-model
+    kind: data_entity
+    files: ["**/*.prisma"]
+    pattern: '^model\s+(?P<model>\w+)\s*\{'
+    label: "model {model}"
+
+  - id: drizzle-table
+    kind: data_entity
+    files: ["**/*.{ts,js}"]
+    pattern: '\b(?:pg|mysql|sqlite)Table\(\s*["''](?P<table>\w+)'
+    label: "table {table}"
+
+  - id: typeorm-entity
+    kind: data_entity
+    files: ["**/*.ts"]
+    pattern: '@Entity\([^)]*\)\s*(?:export\s+)?class\s+(?P<cls>\w+)'
+    label: "entity {cls}"
+
+  - id: jpa-entity
+    kind: data_entity
+    files: ["**/*.{java,kt}"]
+    pattern: '@Entity\b[\s\S]{0,200}?class\s+(?P<cls>\w+)'
+    label: "entity {cls}"
+
+  - id: rails-create-table
+    kind: data_entity
+    files: ["**/db/schema.rb", "**/db/migrate/*.rb"]
+    pattern: '\bcreate_table\s+[:"''](?P<table>\w+)'
+    label: "table {table}"
