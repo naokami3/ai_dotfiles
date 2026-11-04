@@ -1,0 +1,35 @@
+# FastAPI の入口検出ルール
+# パスはルーター内の相対パス。APIRouter(prefix=...) / include_router(prefix=...) による
+# 最終的な URL の合成は正規表現では解決しないため、抽出担当がコードを読んで機能側に書く。
+name: fastapi
+rules:
+  - id: fastapi-route
+    kind: http_endpoint
+    files: ["**/*.py"]
+    # パスは文字列リテラル・定数（@router.get(ITEMS_PATH)）・省略のいずれでも拾う
+    pattern: '^[ \t]*@(?P<obj>\w+)\.(?P<method>get|post|put|patch|delete|head|options|api_route)\(\s*(?:path\s*=\s*)?(?:[rf]?["''](?P<path>[^"'']*)["'']|(?P<const>[A-Za-z_][\w.]*))?'
+    label: "{method|upper} {path}{const} ({obj})"
+
+  - id: fastapi-websocket
+    kind: http_endpoint
+    files: ["**/*.py"]
+    pattern: '^[ \t]*@(?P<obj>\w+)\.websocket\(\s*(?:path\s*=\s*)?["''](?P<path>[^"'']*)["'']'
+    label: "WS {path} ({obj})"
+
+  - id: fastapi-add-api-route
+    kind: http_endpoint
+    files: ["**/*.py"]
+    pattern: '\.add_api_route\(\s*["''](?P<path>[^"'']*)["'']'
+    label: "{path} (add_api_route)"
+
+  - id: fastapi-mount
+    kind: other
+    files: ["**/*.py"]
+    pattern: '\b(?P<obj>\w+)\.mount\(\s*["''](?P<path>[^"'']*)["'']'
+    label: "mount {path} ({obj})"
+
+  - id: fastapi-background-task
+    kind: background_job
+    files: ["**/*.py"]
+    pattern: '\.add_task\(\s*(?P<fn>[\w.]+)'
+    label: "BackgroundTasks {fn}"

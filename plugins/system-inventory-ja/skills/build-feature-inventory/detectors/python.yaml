@@ -1,0 +1,68 @@
+# Python 全般（Web フレームワーク以外）の入口検出ルール: ジョブ・CLI・データモデル・メッセージ購読
+name: python
+rules:
+  - id: celery-task
+    kind: background_job
+    files: ["**/*.py"]
+    pattern: '^[ \t]*@(?:\w+\.)?(?:task|shared_task)\b[^\n]*\n(?:[ \t]*@[^\n]*\n)*[ \t]*(?:async\s+)?def\s+(?P<fn>\w+)'
+    label: "task {fn}"
+
+  - id: celery-beat-schedule
+    kind: scheduled_job
+    files: ["**/*.py"]
+    pattern: '\bbeat_schedule\s*='
+    label: "celery beat_schedule ({file})"
+
+  - id: apscheduler-job
+    kind: scheduled_job
+    files: ["**/*.py"]
+    pattern: '\.add_job\(\s*(?P<fn>[\w.]+)|@\w+\.scheduled_job\((?P<trigger>[^)]*)'
+    label: "scheduled {fn}{trigger}"
+
+  - id: cli-click-typer
+    kind: cli_command
+    files: ["**/*.py"]
+    pattern: '^[ \t]*@(?P<obj>\w+)\.command\([^\n]*\n(?:[ \t]*@[^\n]*\n)*[ \t]*(?:async\s+)?def\s+(?P<fn>\w+)'
+    label: "{obj} {fn}"
+
+  - id: cli-argparse-subcommand
+    kind: cli_command
+    files: ["**/*.py"]
+    pattern: '\.add_parser\(\s*["''](?P<name>[^"'']+)'
+    label: "subcommand {name}"
+
+  - id: cli-main-guard
+    kind: cli_command
+    files: ["**/*.py"]
+    pattern: '^if\s+__name__\s*==\s*["'']__main__["'']'
+    label: "script {file}"
+
+  - id: sqlalchemy-table
+    kind: data_entity
+    files: ["**/*.py"]
+    pattern: '__tablename__\s*=\s*["''](?P<table>\w+)'
+    label: "table {table}"
+
+  - id: sqlmodel-table
+    kind: data_entity
+    files: ["**/*.py"]
+    pattern: '^class\s+(?P<cls>\w+)\([^)\n]*\btable\s*=\s*True'
+    label: "model {cls}"
+
+  - id: django-model
+    kind: data_entity
+    files: ["**/*.py"]
+    pattern: '^class\s+(?P<cls>\w+)\([^)\n]*models\.Model\b'
+    label: "model {cls}"
+
+  - id: django-url
+    kind: http_endpoint
+    files: ["**/urls.py"]
+    pattern: '\b(?:re_)?path\(\s*r?["''](?P<path>[^"'']*)["'']'
+    label: "/{path}"
+
+  - id: message-subscriber
+    kind: event_consumer
+    files: ["**/*.py"]
+    pattern: '@\w+\.(?:subscriber|consumer|on_message|listener)\(\s*["'']?(?P<topic>[^"'')\n]*)'
+    label: "subscribe {topic}"
