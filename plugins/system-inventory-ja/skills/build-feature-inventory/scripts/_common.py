@@ -121,6 +121,15 @@ def norm_ws(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+def copy_schema(work):
+    """スキーマを W/schema.md に写す。抽出・検証担当が触る場所を R と W の2か所に限り、
+    プラグインのキャッシュへの読み取り許可を不要にするため"""
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references", "schema.md")
+    os.makedirs(work, exist_ok=True)
+    with open(src, encoding="utf-8") as f, open(os.path.join(work, "schema.md"), "w", encoding="utf-8", newline="\n") as g:
+        g.write(f.read())
+
+
 def work_paths(work):
     return {
         "files": os.path.join(work, "files.json"),

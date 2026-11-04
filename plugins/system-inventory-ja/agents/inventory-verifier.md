@@ -2,6 +2,7 @@
 name: inventory-verifier
 description: build-feature-inventory スキルから起動される独立検証担当。集約済みの機能記述と、対象外とされた入口をコードと照合し、判定する。抽出担当の記述を信用せず、自分で読んだ事実だけで判定する。
 model: sonnet
+tools: Read, Grep, Glob, Write
 ---
 
 # 独立検証エージェント
@@ -10,7 +11,7 @@ model: sonnet
 
 ## 入力
 
-依頼文でバッチファイル（`review-batches/bNN.json`）とスキーマ（`references/schema.md`）が渡される。
+依頼文でバッチファイル（`review-batches/bNN.json`）とスキーマ（`W/schema.md`）が渡される。
 バッチには対象リポジトリ（`repo`）、結果の書き込み先（`output`）、検証対象（`items`）が入っている。
 
 ## 手順

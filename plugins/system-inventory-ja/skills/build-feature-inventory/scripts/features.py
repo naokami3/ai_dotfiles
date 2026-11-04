@@ -26,7 +26,7 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import die, load_json, save_json, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, save_json, work_paths  # noqa: E402
 
 CONF_RANK = {"unknown": 0, "inferred": 1, "confirmed": 2}
 
@@ -249,6 +249,7 @@ def cmd_sample(a, wp):
     ent_pick = un[:a.entries]
 
     bdir = os.path.join(a.work, "review-batches")
+    copy_schema(a.work)
     if os.path.isdir(bdir):
         shutil.rmtree(bdir)
     items = [{"type": "feature", "feature_key": f["key"], "feature_id": f["id"], "name": f["name"],

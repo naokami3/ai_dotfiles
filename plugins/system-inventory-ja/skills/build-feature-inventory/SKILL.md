@@ -70,12 +70,19 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 
 ## 準備
 
-- スクリプトは `${CLAUDE_SKILL_DIR}/scripts/` にある。**このパスの形のまま**実行する（許可ルールが一致するように）
+- スクリプトは `${CLAUDE_SKILL_DIR}/scripts/` にある。**`python <スクリプトの絶対パス> 引数…` の形で1回に1本だけ**実行する。
+  シェル変数（`S=…; python $S/…`）・`cd`・`&&` や `;` での連結を使うと許可ルールに一致せず拒否される
 - 依存: python3（標準ライブラリ）と PyYAML（検出ルールの読み込みのみ）。無ければ `pip install pyyaml` をユーザーに依頼する
 - 作業ディレクトリ `W` は対象リポジトリの外に作る（既定: スクラッチパッド配下の `inventory-<システム名>/`）。
   中断しても `W` が残っていれば途中から再開できる
 - データ形式は `references/schema.md`、検出ルールの書き方は `references/detectors.md`
 - 以下、対象リポジトリを `R` とする
+- **権限の準備（Phase 2 の前に必須）。** 抽出担当・検証担当は `R` を読み、`W` を読み書きする。
+  `R` がセッションの作業ディレクトリ外なら `/add-dir R` で追加するよう、ユーザーに依頼する。
+  `W` を既定のスクラッチパッド以外に置く場合は、`W` への書き込みも許可してもらう。
+  許可が無いと、並列で動く各エージェントが確認待ちで止まるか、書き込めずに終わる
+- スキーマは `slice_brief.py` / `features.py sample` が `W/schema.md` に写す。エージェントにはこちらを渡す
+  （プラグインのディレクトリへの読み取り許可を不要にするため）
 
 ## Phase 0: 偵察と見積もり
 
@@ -127,7 +134,7 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 2. 出力された未抽出の担当範囲ごとに `inventory-extractor` を起動する。**同時起動は 5〜8 体まで**。
    依頼文は短く、可変部分を最後に置く（各エージェントで共通の前置きがキャッシュされる）:
    ```
-   機能一覧の抽出。スキーマ: ${CLAUDE_SKILL_DIR}/references/schema.md
+   機能一覧の抽出。スキーマ: W/schema.md
    指示書: W/briefs/S5bde43.md
    ```
 3. 完了通知は1行の要約だけを受け取る。抽出 JSON は読まない
@@ -177,7 +184,7 @@ python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W
    python ${CLAUDE_SKILL_DIR}/scripts/features.py sample --work W --n 15 --entries 10
    ```
    機能数が 200 を超える規模なら `--n` を全体の 5〜10% 程度に増やす
-2. `W/review-batches/` のバッチごとに `inventory-verifier` を起動する。依頼文はバッチファイルのパスとスキーマのパスだけ
+2. `W/review-batches/` のバッチごとに `inventory-verifier` を起動する。依頼文はバッチファイルのパスとスキーマのパス（`W/schema.md`）だけ
 3. 検証担当の結果も自動検証する
    ```
    python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W --review W/review/b01.json

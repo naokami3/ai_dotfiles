@@ -18,7 +18,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
 
 
 def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
@@ -87,6 +87,7 @@ def main():
     entries = {e["id"]: e for e in load_json(wp["inventory"])["entries"]} \
         if os.path.exists(wp["inventory"]) else {}
     bdir = os.path.join(a.work, "briefs")
+    copy_schema(a.work)
 
     if a.slice:
         s = by_id.get(a.slice) or die(f"担当範囲 {a.slice} が無い")
