@@ -21,7 +21,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import load_json, load_reviews, work_paths  # noqa: E402
+from _common import load_answers, load_json, load_reviews, question_id, work_paths  # noqa: E402
 from _xlsx import write_xlsx  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -30,7 +30,8 @@ KIND_LABEL = {"http_endpoint": "API", "ui_route": "画面", "cli_command": "CLI"
               "background_job": "非同期ジョブ", "event_consumer": "イベント購読", "webhook": "Webhook",
               "data_entity": "データ", "graphql_operation": "GraphQL", "rpc_method": "RPC", "other": "その他"}
 VERDICT_LABEL = {"correct": "正確", "partially_correct": "一部誤り", "incorrect": "誤り", "unverifiable": "検証不能"}
-ENTRY_VERDICT_LABEL = {"correct": "対象外で正しい", "should_be_feature": "機能にすべき", "unverifiable": "検証不能"}
+ANSWER_LABEL = {"resolved": "コードで解消", "partially_resolved": "一部解消", "unresolved": "未解消"}
+ENTRY_VERDICT_LABEL ={"correct": "対象外で正しい", "should_be_feature": "機能にすべき", "unverifiable": "検証不能"}
 REASON_LABEL = {"health_check": "死活監視", "dev_tool": "開発用", "ops_script": "運用", "test_support": "テスト支援",
                 "framework_internal": "基盤", "data_definition": "データ定義", "duplicate": "重複",
                 "dead_code": "未使用の疑い", "other": "その他", "unassigned": "未割り当て"}
@@ -101,8 +102,22 @@ def build_model(wp):
                          + " / ".join(f"{ENTRY_VERDICT_LABEL.get(k, k)} {n}" for k, n in ec2.items())))
     if sysi.get("partial"):
         overview.insert(0, ("注意", "途中経過: 未合格・未抽出の担当範囲があり、網羅していない"))
-    questions = [(f["id"], f["name"], q["question"], q["how_to_check"] or "（未記載）")
-                 for f in feats for q in f["open_questions"]]
+    # 要確認事項: 回答担当の回答（answers/*.json）があれば状態・回答・根拠を付ける
+    qids = {question_id(f["key"], q["question"]) for f in feats for q in f["open_questions"]}
+    answers, _ = load_answers(wp, qids)
+    questions, qstat = [], collections.Counter()
+    for f in feats:
+        for q in f["open_questions"]:
+            r = answers.get(question_id(f["key"], q["question"]))
+            st = ANSWER_LABEL.get(r["status"], r["status"]) if r else "未着手"
+            if r and r.get("contradicts_summary"):
+                st += "・記述と矛盾"
+            ans = (r.get("answer", "") + "".join(f"（{e['path']}:{e['line']}）" for e in r.get("evidence", [])[:3])) if r else ""
+            q["status"], q["answer"] = st, ans
+            qstat[st] += 1
+            questions.append((f["id"], f["name"], q["question"], q["how_to_check"] or "（未記載）", st, ans))
+    if questions:
+        overview.append(("要確認事項", f"{len(questions)} 件（" + " / ".join(f"{k} {n}" for k, n in qstat.most_common()) + "）"))
 
     # API一覧・画面一覧: エントリーポイントのうち API と画面を、対応する機能名（＝概要・画面名）と並べる
     def listing(kind):
@@ -122,7 +137,8 @@ def write_xlsx_out(m, path):
             CONF_LABEL.get(f["confidence"], f["confidence"]), len(f["entries"]),
             "\n".join(f"[{KIND_LABEL.get(e['kind'], e['kind'])}] {e['label']}" for e in f["entries"]),
             "\n".join(f["data"]), "\n".join(f["external"]),
-            "\n".join(f"{q['question']}（確認方法: {q['how_to_check'] or '未記載'}）" for q in f["open_questions"]),
+            "\n".join(f"【{q.get('status', '未着手')}】{q['question']}（確認方法: {q['how_to_check'] or '未記載'}）"
+                      for q in f["open_questions"]),
             "\n".join(f"{e['path']}:{e['line']}" for e in f["evidence"][:10]), f["review"],
             "\n".join(f"{x['local_id']}: {x['summary']}" for x in f.get("local_summaries", [])) if len(f["sources"]) > 1 else "",
             f["key"]])
@@ -150,7 +166,8 @@ def write_xlsx_out(m, path):
          lrows(m["screens"], True), [40, 30, 56, 18, 9]),
         ("エントリーポイント一覧", ["種別", "エントリーポイント", "ファイル", "行", "機能ID", "機能名", "未分類の理由", "エントリーポイントID"],
          erows, [11, 40, 50, 7, 9, 26, 30, 40]),
-        ("要確認", ["機能ID", "機能名", "未確認の点", "確認方法"], [list(q) for q in m["questions"]], [9, 26, 60, 60]),
+        ("要確認", ["機能ID", "機能名", "未確認の点", "確認方法", "状態", "回答（根拠）"],
+         [list(q) for q in m["questions"]], [9, 26, 50, 50, 14, 60]),
     ])
 
 
@@ -213,7 +230,9 @@ def write_md_out(m, path):
                 w(f"- 外部連携: {', '.join(f['external'])}")
             w("- 根拠: " + ", ".join(f"`{e['path']}:{e['line']}`" for e in f["evidence"][:10]))
             for q in f["open_questions"]:
-                w(f"- 要確認: {q['question']}（確認方法: {q['how_to_check'] or '未記載'}）")
+                w(f"- 要確認【{q.get('status', '未着手')}】: {q['question']}（確認方法: {q['how_to_check'] or '未記載'}）")
+                if q.get("answer"):
+                    w(f"  - 回答: {q['answer']}")
             if f["review"]:
                 w(f"- 独立検証: {f['review']}")
             w("")

@@ -102,7 +102,7 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break
   </section>
 
   <section id="tab-questions" hidden>
-    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>未確認の点</th><th>確認方法</th></tr></thead><tbody id="qtb"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>未確認の点</th><th>確認方法</th><th>状態</th><th>回答（根拠）</th></tr></thead><tbody id="qtb"></tbody></table></div>
   </section>
 
   <section id="tab-coverage" hidden>
@@ -136,7 +136,7 @@ function featText(f){ return [f.id, f.name, f.summary, f.actors.join(' '), f.ent
 function detail(f){
   const ev = f.evidence.map(e => `<div><code>${esc(e.path)}:${e.line}</code> — <code>${esc(e.quote)}</code></div>`).join('');
   const en = f.entries.map(e => `<div><span class="chip">${esc(KIND[e.kind] || e.kind)}</span> <code>${esc(e.label)}</code></div>`).join('') || 'なし';
-  const qs = f.open_questions.map(q => `<div class="q">・${esc(q.question)}</div><div style="margin-left:1em">確認方法: ${esc(q.how_to_check || '（未記載）')}</div>`).join('');
+  const qs = f.open_questions.map(q => `<div class="q">・【${esc(q.status || '未着手')}】${esc(q.question)}</div><div style="margin-left:1em">確認方法: ${esc(q.how_to_check || '（未記載）')}</div>${q.answer ? `<div style="margin-left:1em">回答: ${esc(q.answer)}</div>` : ''}`).join('');
   const cons = (f.constraint_texts || []).map(c => `<div>・${esc(c)}</div>`).join('');
   const locals = (f.local_summaries || []).length > 1 ? f.local_summaries.map(x => `<div><code>${esc(x.local_id)}</code> ${esc(x.summary)}</div>`).join('') : '';
   return `<dl><dt>概要</dt><dd>${esc(f.summary)}</dd>
@@ -206,7 +206,7 @@ function renderS(){
 $('aq').addEventListener('input', renderA);
 $('sq').addEventListener('input', renderS);
 
-$('qtb').innerHTML = D.questions.map(r => `<tr><td class="id">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="q">${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join('') || '<tr><td colspan="4">なし</td></tr>';
+$('qtb').innerHTML = D.questions.map(r => `<tr><td class="id">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="q">${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td>${esc(r[5])}</td></tr>`).join('') || '<tr><td colspan="6">なし</td></tr>';
 $('ctb').innerHTML = D.overview.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('');
 renderF(); renderE(); renderA(); renderS();
 })();

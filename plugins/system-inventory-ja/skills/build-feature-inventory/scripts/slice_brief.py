@@ -18,7 +18,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import copy_schema, die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, norm_question, outline_lines, question_id, read_lines, work_paths  # noqa: E402
 
 
 def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
@@ -31,8 +31,8 @@ def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
               "既存の local_id を別の機能に使い回さない（機能を消したら番号は欠番のまま、新しい機能は新しい番号）。", ""]
         L += [f"- {e}" for e in fix_errors] + [""]
     if review_notes:
-        L += ["## 修正依頼（独立検証の指摘）", "",
-              "別の検証担当がコードと照合して、以下の集約前の機能の記述に誤りを見つけた。指摘の根拠の行を自分で読んで確かめ、",
+        L += ["## 修正依頼（独立検証・要確認事項の回答による指摘）", "",
+              "別の担当がコードと照合して、以下の集約前の機能の記述に誤りを見つけた。指摘の根拠の行を自分で読んで確かめ、",
               "正しければ該当の集約前の機能を直す（要約・actors・constraints・evidence）。指摘が誤りなら直さず notes に理由を書く。",
               "既存の local_id を別の機能に使い回さない。", ""]
         for n in review_notes:
@@ -98,9 +98,17 @@ def main():
         feats = {f["key"]: f for d in load_json(wp["features"])["domains"] for f in d["features"]}
         notes = {}
         stale = 0
+        # 要確認事項への回答（answers/qNN.json）のうち、機能の記述と矛盾したものも同じ扱いで差し戻す
+        qkey = {question_id(f["key"], norm_question(q)["question"]): f["key"]
+                for f in feats.values() for q in f.get("open_questions") or []}
         for rp in a.from_review:
-            for r in load_json(rp).get("results", []):
-                if r.get("verdict") not in ("partially_correct", "incorrect"):
+            d = load_json(rp)
+            found = list(d.get("results", []))
+            found += [{"feature_key": qkey.get(r.get("question_id")), "verdict": "contradicts_summary",
+                       "comment": f"要確認事項への回答が記述と矛盾: {r.get('answer', '')}", "evidence": r.get("evidence", [])}
+                      for r in d.get("answers", []) if r.get("contradicts_summary")]
+            for r in found:
+                if r.get("verdict") not in ("partially_correct", "incorrect", "contradicts_summary"):
                     continue
                 f = feats.get(r.get("feature_key"))
                 if not f:
