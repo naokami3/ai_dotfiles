@@ -3,7 +3,7 @@
 
 - ディレクトリ境界を優先し、隣接する小さな単位は上限まで詰める（同じ文脈のコードを同じ読み手へ）
 - 上限を超える単一ファイルは行範囲で分割する
-- 重複ファイル（dup_of あり）は正規ファイル側だけを読む（入口は正規ファイルの担当範囲に割り当てる）
+- 重複ファイル（dup_of あり）は正規ファイル側だけを読む（エントリーポイントは正規ファイルの担当範囲に割り当てる）
 - --outline-role の役割（既定: test）は全文ではなくアウトライン（定義行・テスト名）だけを読む
 - 担当範囲 ID は内容ハッシュ由来（S + 6桁）。中身が同じなら ID も同じなので、再分割しても
   抽出結果・検証結果はそのまま有効。中身が変わった担当範囲は別 ID になり、古い参照は大きく失敗する
@@ -153,7 +153,7 @@ def main():
     groups = units_for(root, a.max_lines)
     ent_by_path = {}
     for e in inventory:
-        # 重複ファイルの入口は、内容が同じ正規ファイルの同じ行として割り当てる
+        # 重複ファイルのエントリーポイントは、内容が同じ正規ファイルの同じ行として割り当てる
         ent_by_path.setdefault(e.get("dup_of") or e["path"], []).append(e)
 
     slices, used = [], set()
@@ -212,8 +212,8 @@ def main():
 
     print(f"担当範囲 {len(slices)} 件（上限 {a.max_lines} 行、平均 {sum(s['cost'] for s in slices) // max(1, len(slices))} 行）")
     print(f"全文読み {full_lines} 行 / 抜粋読み {outline_cost} 行（{','.join(sorted(outline_roles)) or 'なし'}）")
-    print(f"入口の割り当て: {len(inventory) - unassigned} / {len(inventory)} 件"
-          + (f"（未割り当て {unassigned} 件: 読まない役割のファイルにある入口）" if unassigned else ""))
+    print(f"エントリーポイントの割り当て: {len(inventory) - unassigned} / {len(inventory)} 件"
+          + (f"（未割り当て {unassigned} 件: 読まない役割のファイルにあるエントリーポイント）" if unassigned else ""))
     print(f"抽出済み {len(done)} / 未抽出 {todo}")
     print(f"概算トークン（全体）: 約 {est:,}（{a.tokens_per_line}/行 + {a.overhead:,}/体）")
     print(f"概算トークン（未抽出分）: 約 {est_todo:,}")

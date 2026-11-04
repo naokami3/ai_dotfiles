@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""ファイル一覧・入口一覧に対する網羅率を集計する（coverage.json）。
+"""ファイル一覧・エントリーポイント一覧に対する網羅率を集計する（coverage.json）。
 
 verify_evidence.py の結果を前提に、合格した担当範囲だけを「読了済み」として数える。
 1ファイルが複数の担当範囲に分割されている場合は、全区間が合格して初めて網羅済みとする。
 features.json と review/*.json があれば、確信度の内訳と独立検証の結果も集計する
 （features.json に存在しない feature_key の検証結果は、merge し直す前の古いものとして数えない）。
-ファイル網羅率が 100% 未満、または未対応の入口が残っていれば終了コード 1。
+ファイル網羅率が 100% 未満、または未対応のエントリーポイントが残っていれば終了コード 1。
 
 使い方:
     python3 check_coverage.py --work <作業ディレクトリ>
@@ -57,7 +57,7 @@ def main():
     read_full = sum(i["end"] - i["start"] + 1 for p in read_paths for i in items_ok[p] if i["mode"] == "full")
     outline_files = sum(1 for p in read_paths if all(i["mode"] == "outline" for i in items_all[p]))
 
-    # 入口の網羅
+    # エントリーポイントの網羅
     mapped, unmapped, no_entry, missing, local_total = set(), {}, 0, [], 0
     for s in passed:
         d = load_json(os.path.join(wp["extract_dir"], f"{s['id']}.json"))
@@ -123,16 +123,16 @@ def main():
           f"  うち抜粋読み {outline_files} / 除外 {len(manifest['excluded'])}")
     print(f"行（全文読み）: {read_full}/{total_lines} ({pct(read_full, total_lines)})")
     e = report["entries"]
-    print(f"入口: 機能に対応 {e['in_features']} / 理由付き対象外 {e['unmapped_with_reason']} / 未対応 {len(open_entries)}"
+    print(f"エントリーポイント: 機能に対応 {e['in_features']} / 理由付き対象外 {e['unmapped_with_reason']} / 未対応 {len(open_entries)}"
           f"（全 {e['total']}、読まない役割のファイル内 {len(unread_entries)}）")
     if um_by_code:
         print("  対象外の理由: " + ", ".join(f"{k} {n}" for k, n in um_by_code.most_common())
               + " / 種別ごとの対象外率: " + ", ".join(f"{k} {v}" for k, v in e["unmapped_rate_by_kind"].items()))
     if report["excluded_candidates"]:
-        print(f"※ 除外ファイル内の入口候補 {report['excluded_candidates']} 件（enumerate_entrypoints の警告を確認したか）")
-    print(f"集約前の機能 {local_total} 件（入口なし {no_entry}）")
+        print(f"※ 除外ファイル内のエントリーポイント候補 {report['excluded_candidates']} 件（enumerate_entrypoints の警告を確認したか）")
+    print(f"集約前の機能 {local_total} 件（エントリーポイントなし {no_entry}）")
     if missing:
-        print("一覧に無かった入口の報告（検出ルールの見直し候補）: "
+        print("一覧に無かったエントリーポイントの報告（検出ルールの見直し候補）: "
               + ", ".join(f"{k} {n}" for k, n in report["missing_entries_by_kind"].items()))
         for m in missing[:20]:
             print(f"  {m.get('kind')}: {m.get('label')} @ {m.get('path')}:{m.get('line')}")
@@ -144,7 +144,7 @@ def main():
               + ("（途中経過）" if f["partial"] else ""))
     if "review" in report:
         r = report["review"]
-        print(f"独立検証: 機能 {r['features']} / 対象外の入口 {r['unmapped_entries']}"
+        print(f"独立検証: 機能 {r['features']} / 対象外のエントリーポイント {r['unmapped_entries']}"
               + (f"（古い結果 {r['stale_ignored']} 件は無視）" if r["stale_ignored"] else ""))
     ok = not uncovered and not open_entries and not unread_entries and st.get("passed", 0) == st["total"]
     print("判定: 網羅完了" if ok else "判定: 未完了（上の不足を解消する）")

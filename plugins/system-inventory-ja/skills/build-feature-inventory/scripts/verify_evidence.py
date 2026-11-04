@@ -7,7 +7,7 @@
    （空白差は無視。±2 行のずれは自動補正して警告、それ以上は不合格）
 3. 高リスクの主張: actors と constraints は evidence の番号を必須にする。要約に制約表現
    （〜のみ・〜できない等）があるのに constraints が空なら不合格
-4. 入口の対応付け: 担当範囲の入口が全件 features か unmapped_entries（理由コード付き）に載っているか
+4. エントリーポイントの対応付け: 担当範囲のエントリーポイントが全件 features か unmapped_entries（理由コード付き）に載っているか
 5. 読了確認: 指示書が指定した全区間に、区間内の行の引用があるか（自己申告ではなく照合で読了を確かめる）
 6. 鮮度と ID の安定: slice_hash が現在と一致するか。前回合格時と同じ local_id が、根拠の重ならない
    別の機能に使い回されていないか
@@ -138,6 +138,16 @@ def verify_slice(ctx, s, prev):
         for key in ("entry_ids", "data", "external", "open_questions", "actors", "constraints"):
             if key in f and not isinstance(f[key], list):
                 errors.append(f"{w}: {key} は配列にする")
+        oq = f.get("open_questions")
+        for j, q in enumerate(oq if isinstance(oq, list) else []):
+            if isinstance(q, str):
+                warnings.append(f"{w}.open_questions[{j}]: 旧形式（文字列）。question と how_to_check に分けて書く")
+            elif not isinstance(q, dict):
+                errors.append(f"{w}.open_questions[{j}]: {{\"question\", \"how_to_check\"}} の形にする")
+            else:
+                for k in ("question", "how_to_check"):
+                    if len(str(q.get(k) or "").strip()) < 8:
+                        errors.append(f"{w}.open_questions[{j}].{k} が無いか短すぎる（何が未確認か・どう確かめるかを具体的に書く）")
         evs = f.get("evidence") or []
         if not evs:
             errors.append(f"{w}: evidence が無い（根拠の無い機能は書かない）")
@@ -162,7 +172,7 @@ def verify_slice(ctx, s, prev):
                           "制約ごとに根拠の番号を付けて constraints に書く")
         for eid in f.get("entry_ids") or []:
             if eid not in ctx.entries:
-                errors.append(f"{w}: entry_ids に存在しない入口ID: {eid}")
+                errors.append(f"{w}: entry_ids に存在しないエントリーポイントID: {eid}")
             mapped.add(eid)
 
     # 前回合格時と同じ local_id が、根拠の重ならない別の機能に使い回されていないか
@@ -172,7 +182,7 @@ def verify_slice(ctx, s, prev):
 
     for k, u in enumerate(d.get("unmapped_entries") or []):
         if u.get("entry_id") not in ctx.entries:
-            errors.append(f"unmapped_entries[{k}]: 存在しない入口ID: {u.get('entry_id')}")
+            errors.append(f"unmapped_entries[{k}]: 存在しないエントリーポイントID: {u.get('entry_id')}")
         if u.get("reason_code") not in UNMAPPED_CODES:
             errors.append(f"unmapped_entries[{k}]: reason_code は {sorted(UNMAPPED_CODES)} のいずれか")
         if len((u.get("reason") or "").strip()) < 8:
@@ -187,7 +197,7 @@ def verify_slice(ctx, s, prev):
 
     for eid in s["entry_ids"]:
         if eid not in mapped:
-            errors.append(f"入口が未対応: {eid}（features.entry_ids か unmapped_entries に載せる）")
+            errors.append(f"エントリーポイントが未対応: {eid}（features.entry_ids か unmapped_entries に載せる）")
 
     # 読了確認: 指定区間ごとに、その区間内の行の引用が1件以上
     answers = d.get("read_checks") or []
