@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""スライス横断の集約を支援する。機械検証に合格した抽出結果だけを使う。サブコマンド:
+"""担当範囲横断の集約を支援する。自動検証に合格した抽出結果だけを使う。サブコマンド:
 
-digest  合格済みの局所機能を 1 機能 1 行に圧縮したダイジェストを書き出す。
+digest  合格済みの集約前の機能を 1 機能 1 行に圧縮した要約一覧を書き出す。
         集約担当はコードも抽出 JSON も読まず、これだけを見てグループ分けする。
             python3 features.py digest --work W [--prefix app/billing] [--out W/digest.txt]
-        --prefix は局所機能の根拠ファイルのパスで絞る（同じ局所機能が複数のダイジェストに重複しない）
+        --prefix は集約前の機能の根拠ファイルのパスで絞る（同じ集約前の機能が複数の要約一覧に重複しない）
 
 merge   集約担当が書いた grouping（名前・グループ分け・sources・actor_map、複数 sources の統合要約だけ）
         から features.json を作る。入口・データ・根拠・制約・確信度・要確認事項は sources から機械的に
-        引き継ぐ。sources が1件の機能は局所要約をそのまま使う（統合文を書かせない）。
+        引き継ぐ。sources が1件の機能は集約前の要約をそのまま使う（統合文を書かせない）。
         grouping は複数ファイルを渡せる（ドメインごとに分けて作った場合）。
             python3 features.py merge --work W --grouping W/grouping.json [W/grouping-2.json ...]
 
@@ -32,7 +32,7 @@ CONF_RANK = {"unknown": 0, "inferred": 1, "confirmed": 2}
 
 
 def load_verified(wp, allow_partial=False):
-    """機械検証に合格し、slice_hash が現在と一致する抽出結果だけを返す"""
+    """自動検証に合格し、slice_hash が現在と一致する抽出結果だけを返す"""
     slices = load_json(wp["slices"])["slices"]
     ok, ng = [], []
     for s in slices:
@@ -46,7 +46,7 @@ def load_verified(wp, allow_partial=False):
                 continue
         ng.append(s["id"])
     if ng and not allow_partial:
-        die(f"未検証・不合格・未抽出のスライスが {len(ng)} 件ある（{' '.join(ng[:10])}）。"
+        die(f"未検証・不合格・未抽出の担当範囲が {len(ng)} 件ある（{' '.join(ng[:10])}）。"
             "verify_evidence.py を通してから実行する（途中経過を見るだけなら --allow-partial）", 1)
     return slices, ok, ng
 
@@ -88,9 +88,9 @@ def cmd_digest(a, wp):
     out = a.out or os.path.join(a.work, "digest.txt")
     with open(out, "w", encoding="utf-8", newline="\n") as fp:
         fp.write("\n".join(lines) + "\n")
-    print(f"ダイジェストを出力: {out}（局所機能 {n} 件 / 合格スライス {len(extracts)} / 全 {len(slices)}）")
+    print(f"要約一覧を出力: {out}（集約前の機能 {n} 件 / 合格した担当範囲 {len(extracts)} / 全 {len(slices)}）")
     actors = collections.Counter(x for _, d in extracts for f in d.get("features", []) for x in actor_names(f))
-    print("局所の利用者表記（actor_map で統一語彙に写像する）: "
+    print("集約前の利用者表記（actor_map で統一語彙に写像する）: "
           + ", ".join(f"{k}({v})" for k, v in actors.most_common()))
 
 
@@ -123,7 +123,7 @@ def cmd_merge(a, wp):
     all_actor_names = {x for f in local.values() for x in actor_names(f)}
     unmapped_actors = sorted(all_actor_names - set(actor_map))
     if unmapped_actors:
-        errors.append(f"actor_map に無い局所の利用者表記: {', '.join(unmapped_actors)}（統一語彙への写像を書く）")
+        errors.append(f"actor_map に無い集約前の利用者表記: {', '.join(unmapped_actors)}（統一語彙への写像を書く）")
     for di, dom in enumerate(domains_in, 1):
         feats = []
         if not (dom.get("name") or "").strip():
@@ -137,7 +137,7 @@ def cmd_merge(a, wp):
             src = []
             for sid in srcs:
                 if sid not in local:
-                    errors.append(f"{fid} {gf.get('name')}: 存在しない（または未合格の）局所機能 {sid}")
+                    errors.append(f"{fid} {gf.get('name')}: 存在しない（または未合格の）集約前の機能 {sid}")
                 else:
                     used[sid] += 1
                     src.append(local[sid])
@@ -145,14 +145,14 @@ def cmd_merge(a, wp):
                 continue
             if len(src) == 1:
                 if gf.get("summary"):
-                    warns.append(f"{fid}: sources が1件なので grouping の summary は使わず局所要約を使った")
+                    warns.append(f"{fid}: sources が1件なので grouping の summary は使わず集約前の要約を使った")
                 summary = src[0].get("summary", "")
                 name = gf.get("name") or src[0].get("name", "")
             else:
                 summary = (gf.get("summary") or "").strip()
                 name = (gf.get("name") or "").strip()
                 if not summary or not name:
-                    errors.append(f"{fid}: sources が複数の機能は name と summary（局所要約の統合）が必須")
+                    errors.append(f"{fid}: sources が複数の機能は name と summary（集約前の要約の統合）が必須")
 
             def union(items):
                 seen, out = set(), []
@@ -188,10 +188,10 @@ def cmd_merge(a, wp):
                         "features": feats})
 
     for u in sorted(set(local) - set(used)):
-        errors.append(f"どの機能にも配置されていない局所機能: {u} {local[u]['name']}")
+        errors.append(f"どの機能にも配置されていない集約前の機能: {u} {local[u]['name']}")
     multi = sorted(k for k, n in used.items() if n > 1)
     if multi and not a.allow_multi:
-        errors.append(f"複数の機能に配置された局所機能: {' '.join(multi[:20])}（意図的なら --allow-multi）")
+        errors.append(f"複数の機能に配置された集約前の機能: {' '.join(multi[:20])}（意図的なら --allow-multi）")
 
     mapped = {e["id"] for d in domains for f in d["features"] for e in f["entries"]}
     unclassified = []
@@ -201,7 +201,7 @@ def cmd_merge(a, wp):
         u = unmapped.get(eid, {})
         unclassified.append({"id": eid, "kind": e["kind"], "label": e["label"], "path": e["path"], "line": e["line"],
                              "reason_code": u.get("reason_code", "unassigned"),
-                             "reason": u.get("reason", "どのスライスでも対応付けられていない")})
+                             "reason": u.get("reason", "どの担当範囲でも対応付けられていない")})
 
     for w in warns[:20]:
         print(f"警告: {w}")
@@ -220,9 +220,9 @@ def cmd_merge(a, wp):
         "domains": domains, "unclassified_entries": unclassified, "missing_entries": missing_entries,
     })
     print(f"features.json を出力: {wp['features']}")
-    print(f"ドメイン {len(domains)} / 機能 {fno} / 局所機能 {len(local)}（重複配置 {len(multi)}）"
-          + ("（途中経過: 未合格スライスあり）" if ng else ""))
-    print(f"未分類の入口 {len(unclassified)} 件 / 分母に無かった入口の報告 {len(missing_entries)} 件")
+    print(f"ドメイン {len(domains)} / 機能 {fno} / 集約前の機能 {len(local)}（重複配置 {len(multi)}）"
+          + ("（途中経過: 未合格の担当範囲あり）" if ng else ""))
+    print(f"未分類の入口 {len(unclassified)} 件 / 一覧に無かった入口の報告 {len(missing_entries)} 件")
 
 
 def cmd_sample(a, wp):

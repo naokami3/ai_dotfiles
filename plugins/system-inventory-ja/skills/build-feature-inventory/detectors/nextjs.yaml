@@ -1,4 +1,4 @@
-# Next.js（App Router / Pages Router）の入口検出器
+# Next.js（App Router / Pages Router）の入口検出ルール
 # ファイルシステムルーティングなので、ファイルパスから URL を組み立てる。
 # ルートグループ (group)・並列ルート @slot は URL に現れないので取り除く。
 name: nextjs

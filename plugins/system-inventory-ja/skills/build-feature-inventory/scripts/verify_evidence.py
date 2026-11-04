@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""抽出結果（extract/<slice>.json）をスライス単位で機械検証する。
+"""抽出結果（extract/<slice>.json）を担当範囲ごとに自動検証する。
 
 検証内容:
 1. スキーマ（必須項目・確信度・local_id の形式。推定/不明には要確認事項が必須）
@@ -7,8 +7,8 @@
    （空白差は無視。±2 行のずれは自動補正して警告、それ以上は不合格）
 3. 高リスクの主張: actors と constraints は evidence の番号を必須にする。要約に制約表現
    （〜のみ・〜できない等）があるのに constraints が空なら不合格
-4. 入口の対応付け: スライスの入口が全件 features か unmapped_entries（理由コード付き）に載っているか
-5. 読了確認: 作業票が指定した全区間に、区間内の行の引用があるか（自己申告ではなく照合で読了を確かめる）
+4. 入口の対応付け: 担当範囲の入口が全件 features か unmapped_entries（理由コード付き）に載っているか
+5. 読了確認: 指示書が指定した全区間に、区間内の行の引用があるか（自己申告ではなく照合で読了を確かめる）
 6. 鮮度と ID の安定: slice_hash が現在と一致するか。前回合格時と同じ local_id が、根拠の重ならない
    別の機能に使い回されていないか
 
@@ -68,7 +68,7 @@ def check_quote(ctx, ev, where, errors, warnings, window=None):
         if not os.path.isfile(os.path.join(ctx.repo, path)):
             errors.append(f"{where}: ファイルが存在しない: {path}")
             return False
-        warnings.append(f"{where}: 分母外のファイルを根拠にしている: {path}")
+        warnings.append(f"{where}: 一覧外のファイルを根拠にしている: {path}")
     ls = ctx.lines(path)
     if not 1 <= line <= len(ls):
         errors.append(f"{where}: 行番号が範囲外: {path}:{line}（{len(ls)}行）")
@@ -115,7 +115,7 @@ def verify_slice(ctx, s, prev):
     if d.get("slice_id") != s["id"]:
         errors.append(f"slice_id が {s['id']} ではない: {d.get('slice_id')}")
     if d.get("slice_hash") != s["hash"]:
-        errors.append(f"slice_hash が現在のスライスと一致しない（古い結果）: {d.get('slice_hash')} != {s['hash']}")
+        errors.append(f"slice_hash が現在の担当範囲と一致しない（古い結果）: {d.get('slice_hash')} != {s['hash']}")
     slice_paths = {i["path"] for i in s["items"]}
 
     mapped, ids, id_paths = set(), set(), {}
@@ -144,7 +144,7 @@ def verify_slice(ctx, s, prev):
         for j, ev in enumerate(evs):
             check_quote(ctx, ev, f"{w}.evidence[{j}]", errors, warnings)
             if isinstance(ev.get("path"), str) and ev["path"] not in slice_paths:
-                warnings.append(f"{w}.evidence[{j}]: スライス外のファイル {ev['path']}")
+                warnings.append(f"{w}.evidence[{j}]: 担当範囲外のファイル {ev['path']}")
         id_paths[lid] = sorted({ev.get("path") for ev in evs if isinstance(ev.get("path"), str)})
         for j, a in enumerate(f.get("actors") or []):
             if not isinstance(a, dict) or not (a.get("name") or "").strip():
@@ -268,7 +268,7 @@ def main():
             failed.append(res)
             if res["attempts"] >= MAX_ATTEMPTS:
                 stuck.append(s["id"])
-    print(f"合格 {len(passed)} / 不合格 {len(failed)} / 未抽出 {len(missing)}（対象 {len(slices)} スライス）")
+    print(f"合格 {len(passed)} / 不合格 {len(failed)} / 未抽出 {len(missing)}（担当範囲 {len(slices)} 件）")
     for r in failed:
         print(f"- {r['slice']}: エラー {len(r['errors'])} 件・不合格 {r['attempts']} 回目（先頭: {r['errors'][0]}）")
     if missing:

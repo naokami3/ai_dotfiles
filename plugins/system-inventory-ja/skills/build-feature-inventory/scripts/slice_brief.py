@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""抽出担当エージェントが読むスライスの作業票を作る。
+"""抽出担当エージェントが読む担当範囲の指示書を作る。
 
-作業票の内容:
+指示書の内容:
 - 全文を読むファイルと行範囲（抽出担当が Read ツールで読む）
 - 読了確認の窓（各窓から1行ずつ引用させる。スクリプトが決めた区間なので、読まずには答えにくい）
-- アウトライン読みのファイルは、定義行・テスト名だけをここで展開済み（Read 不要）
-- このスライスに割り当てられた入口（すべて features か unmapped_entries に対応付ける）
-- 修正モード: 前回の機械検証のエラー、または独立検証の指摘
+- 抜粋読みのファイルは、定義行・テスト名だけをここで展開済み（Read 不要）
+- この担当範囲に割り当てられた入口（すべて features か unmapped_entries に対応付ける）
+- 修正依頼: 前回の自動検証のエラー、または独立検証の指摘
 
 使い方:
-    python3 slice_brief.py --work W --pending            # 未合格の全スライスの作業票を W/briefs/ に書く
-    python3 slice_brief.py --work W --from-review W/review/b1.json   # 独立検証の指摘から修正票を書く
+    python3 slice_brief.py --work W --pending            # 未合格の全担当範囲の指示書を W/briefs/ に書く
+    python3 slice_brief.py --work W --from-review W/review/b1.json   # 独立検証の指摘から修正の指示書を書く
     python3 slice_brief.py --work W --slice S1a2b3c      # 1件を標準出力に出す（確認用）
 """
 import argparse
@@ -22,18 +22,18 @@ from _common import die, load_json, outline_lines, read_lines, work_paths  # noq
 
 
 def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
-    L = [f"# スライス {s['id']}", "",
+    L = [f"# 担当範囲 {s['id']}", "",
          f"- slice_id: {s['id']}", f"- slice_hash: {s['hash']}", f"- リポジトリ: {repo}",
          f"- 出力先: {os.path.join(wp['extract_dir'], s['id'] + '.json')}", ""]
     if fix_errors:
-        L += ["## 修正モード（機械検証の不合格）", "",
+        L += ["## 修正依頼（自動検証の不合格）", "",
               "出力先の既存ファイルを読み、以下のエラーだけを直す。コードの再読はエラーの確認に必要な範囲だけにする。",
               "既存の local_id を別の機能に使い回さない（機能を消したら番号は欠番のまま、新しい機能は新しい番号）。", ""]
         L += [f"- {e}" for e in fix_errors] + [""]
     if review_notes:
-        L += ["## 修正モード（独立検証の指摘）", "",
-              "別の検証担当がコードと突合して、以下の局所機能の記述に誤りを見つけた。指摘の根拠の行を自分で読んで確かめ、",
-              "正しければ該当の局所機能を直す（要約・actors・constraints・evidence）。指摘が誤りなら直さず notes に理由を書く。",
+        L += ["## 修正依頼（独立検証の指摘）", "",
+              "別の検証担当がコードと照合して、以下の集約前の機能の記述に誤りを見つけた。指摘の根拠の行を自分で読んで確かめ、",
+              "正しければ該当の集約前の機能を直す（要約・actors・constraints・evidence）。指摘が誤りなら直さず notes に理由を書く。",
               "既存の local_id を別の機能に使い回さない。", ""]
         for n in review_notes:
             L.append(f"- 対象: {', '.join(n['local_ids'])}（{n['verdict']}）: {n['comment']}")
@@ -51,13 +51,13 @@ def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
               "各区間から、10 文字以上ある行を1行選び、`read_checks` に path・line・quote（その行の文字列をそのまま）で書く。", ""]
         L += [f"- {c['path']} L{c['start']}-{c['end']}" for c in checks] + [""]
     if outl:
-        L += [f"## アウトライン読みのファイル（{len(outl)} 件）", "",
+        L += [f"## 抜粋読みのファイル（{len(outl)} 件）", "",
               "以下が内容の要約（定義行・テスト名）。挙動を確かめたい箇所だけ Read してよい。", ""]
         for i in outl:
             L.append(f"### {i['path']}")
             L += [f"{n}: {t.strip()[:160]}" for n, t in outline_lines(read_lines(repo, i["path"]))]
             L.append("")
-    L += [f"## このスライスの入口（{len(s['entry_ids'])} 件。全件を対応付ける）", ""]
+    L += [f"## この担当範囲の入口（{len(s['entry_ids'])} 件。全件を対応付ける）", ""]
     for eid in s["entry_ids"]:
         e = entries.get(eid, {})
         note = f"（{e['dup_of']} と同一内容）" if e.get("dup_of") else ""
@@ -89,7 +89,7 @@ def main():
     bdir = os.path.join(a.work, "briefs")
 
     if a.slice:
-        s = by_id.get(a.slice) or die(f"スライス {a.slice} が無い")
+        s = by_id.get(a.slice) or die(f"担当範囲 {a.slice} が無い")
         print(brief(wp, repo, s, entries), end="")
         return
 
@@ -114,7 +114,7 @@ def main():
         for sid, ns in notes.items():
             uniq = {(n["comment"], tuple(n["local_ids"])): n for n in ns}.values()
             write(bdir, sid, brief(wp, repo, by_id[sid], entries, review_notes=list(uniq)))
-        print(f"修正票を出力: {bdir}（{len(notes)} スライス: {' '.join(notes)}）")
+        print(f"修正の指示書を出力: {bdir}（担当範囲 {len(notes)} 件: {' '.join(notes)}）")
         if stale:
             print(f"※ features.json に存在しない feature_key の指摘 {stale} 件は無視した（merge し直した後の古い検証結果）")
         return
@@ -130,9 +130,9 @@ def main():
         errs = v.get("errors") if v and not v.get("missing") else None
         write(bdir, s["id"], brief(wp, repo, s, entries, fix_errors=errs))
         (fixes if errs else new).append(s["id"])
-    print(f"作業票を出力: {bdir}")
+    print(f"指示書を出力: {bdir}")
     print(f"未抽出 {len(new)}: {' '.join(new)}")
-    print(f"修正モード {len(fixes)}: {' '.join(fixes)}")
+    print(f"修正依頼 {len(fixes)}: {' '.join(fixes)}")
 
 
 if __name__ == "__main__":

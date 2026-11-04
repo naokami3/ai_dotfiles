@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""features.json（正典）から人間向けの機能一覧を生成する。出力は3形式:
+"""features.json（元データ）から人間向けの機能一覧を生成する。出力は3形式:
 
 - feature-inventory.xlsx : Excel で読む表（シート: 概要 / 機能一覧 / 入口一覧 / 要確認）
 - feature-inventory.html : ブラウザで読む1ファイル完結の表（検索・絞り込み・詳細展開）
@@ -68,8 +68,8 @@ def build_model(wp):
     entries = [{"id": e["id"], "kind": e["kind"], "label": e["label"], "path": e["path"], "line": e["line"],
                 "features": by_entry.get(e["id"], []), "reason": reasons.get(e["id"], "")} for e in inv]
     for m in fd.get("missing_entries", []):
-        entries.append({"id": "", "kind": m.get("kind", "other"), "label": m.get("label", "") + "（抽出時に報告・検出器外）",
-                        "path": m["path"], "line": m["line"], "features": [], "reason": "検出器で拾えなかった入口"})
+        entries.append({"id": "", "kind": m.get("kind", "other"), "label": m.get("label", "") + "（抽出時に報告・検出ルール外）",
+                        "path": m["path"], "line": m["line"], "features": [], "reason": "検出ルールで拾えなかった入口"})
 
     conf = collections.Counter(f["confidence"] for f in feats)
     overview = [("対象", sysi["repo"] + (f" / {sysi['subdir']}" if sysi.get("subdir") else "")),
@@ -82,7 +82,7 @@ def build_model(wp):
     if cov:
         fc, lc, ec = cov["files"], cov["lines"], cov["entries"]
         overview += [("ファイル網羅", f"{fc['covered']} / {fc['total']}（{pct(fc['covered'], fc['total'])}）"),
-                     ("うちアウトライン読み", fc["outline_only"]),
+                     ("うち抜粋読み", fc["outline_only"]),
                      ("全文読みした行", f"{lc['read_full']} / {lc['total_unique']}"),
                      ("対象外とした役割", ", ".join(fc["skipped_roles"]) or "なし"),
                      ("除外ファイル", f"{fc['excluded']}（" + ", ".join(f"{k} {n}" for k, n in fc["excluded_by_reason"].items()) + "）"),
@@ -99,7 +99,7 @@ def build_model(wp):
         overview.append(("独立検証（対象外の入口・抜き取り）", f"{len(entry_reviews)} 件中 "
                          + " / ".join(f"{ENTRY_VERDICT_LABEL.get(k, k)} {n}" for k, n in ec2.items())))
     if sysi.get("partial"):
-        overview.insert(0, ("注意", "途中経過: 未合格・未抽出のスライスがあり、網羅していない"))
+        overview.insert(0, ("注意", "途中経過: 未合格・未抽出の担当範囲があり、網羅していない"))
     questions = [(f["id"], f["name"], q) for f in feats for q in f["open_questions"]]
     return {"system": sysi, "domains": domains, "feats": feats, "entries": entries, "overview": overview,
             "stats": stats, "questions": questions, "cov": cov}
@@ -124,7 +124,7 @@ def write_xlsx_out(m, path):
         ("概要", ["項目", "値"], [list(r) for r in m["overview"]], [22, 90]),
         ("機能一覧", ["ドメインID", "ドメイン", "機能ID", "機能名", "概要", "利用者", "制約（根拠）", "確信度", "入口数",
                    "入口", "データ", "外部連携", "要確認", "根拠（ファイル:行）", "独立検証",
-                   "元の局所要約（統合した機能のみ）", "機能キー"],
+                   "統合前の要約（統合した機能のみ）", "機能キー"],
          frows, [9, 16, 8, 26, 60, 16, 44, 9, 7, 44, 22, 16, 40, 40, 16, 60, 12]),
         ("入口一覧", ["種別", "入口", "ファイル", "行", "機能ID", "機能名", "未分類の理由", "入口ID"],
          erows, [11, 40, 50, 7, 9, 26, 30, 40]),
@@ -158,7 +158,7 @@ def write_md_out(m, path):
     w = L.append
     w(f"# 機能一覧: {m['system']['name']}")
     w("")
-    w("> 正典は `features.json`。根拠（`ファイル:行`）は機械検証済みの引用にもとづく。")
+    w("> 元データは `features.json`。根拠（`ファイル:行`）は自動検証済みの引用にもとづく。")
     w("> 確信度「推定」「不明」と「要確認」は人間による確認が必要。")
     w("")
     w("## 概要")

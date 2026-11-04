@@ -1,4 +1,4 @@
-# FastAPI の入口検出器
+# FastAPI の入口検出ルール
 # パスはルーター内の相対パス。APIRouter(prefix=...) / include_router(prefix=...) による
 # 最終的な URL の合成は正規表現では解決しないため、抽出担当がコードを読んで機能側に書く。
 name: fastapi

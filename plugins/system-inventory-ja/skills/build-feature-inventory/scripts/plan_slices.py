@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""ファイル分母をスライス（1サブエージェントが読む単位）に分割する（slices.json）。
+"""ファイル一覧を担当範囲（1サブエージェントが読む単位）に分割する（slices.json）。
 
 - ディレクトリ境界を優先し、隣接する小さな単位は上限まで詰める（同じ文脈のコードを同じ読み手へ）
 - 上限を超える単一ファイルは行範囲で分割する
-- 重複ファイル（dup_of あり）は正規ファイル側だけを読む（入口は正規ファイルのスライスに割り当てる）
+- 重複ファイル（dup_of あり）は正規ファイル側だけを読む（入口は正規ファイルの担当範囲に割り当てる）
 - --outline-role の役割（既定: test）は全文ではなくアウトライン（定義行・テスト名）だけを読む
-- スライス ID は内容ハッシュ由来（S + 6桁）。中身が同じなら ID も同じなので、再分割しても
-  抽出結果・検証結果はそのまま有効。中身が変わったスライスは別 ID になり、古い参照は大きく失敗する
+- 担当範囲 ID は内容ハッシュ由来（S + 6桁）。中身が同じなら ID も同じなので、再分割しても
+  抽出結果・検証結果はそのまま有効。中身が変わった担当範囲は別 ID になり、古い参照は大きく失敗する
 - 読了確認の窓: 全文読みの各ファイル（1000 行ごと）に、引用を求める小区間を決定的に選ぶ
 
 使い方:
     python3 plan_slices.py --work <作業ディレクトリ> [--max-lines 5000]
         [--skip-role doc] [--outline-role test] [--tokens-per-line 35] [--overhead 15000] [--dry-run]
---dry-run は見積もりだけを出し、何も書き換えない（パイロット後の見積もり補正に使う）。
+--dry-run は見積もりだけを出し、何も書き換えない（試行後の見積もり補正に使う）。
 """
 import argparse
 import hashlib
@@ -116,7 +116,7 @@ def main():
     ap.add_argument("--skip-role", default="doc", help="読まない役割（カンマ区切り、空で全て読む）")
     ap.add_argument("--outline-role", default="test", help="アウトラインだけ読む役割（カンマ区切り）")
     ap.add_argument("--tokens-per-line", type=float, default=35.0,
-                    help="1行あたりトークン（ツール呼び出しごとの文脈再処理を含む実測値。パイロットで補正）")
+                    help="1行あたりトークン（ツール呼び出しごとの文脈再処理を含む実測値。試行で補正）")
     ap.add_argument("--overhead", type=int, default=15000, help="サブエージェント1体あたりの固定トークン")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
@@ -172,7 +172,7 @@ def main():
 
     ids = {s["id"] for s in slices}
     stale_dir = os.path.join(wp["extract_dir"], "_stale")
-    # 以前に退避した抽出結果と同じ ID（＝同じ内容）のスライスが復活したら、退避から戻して再利用する
+    # 以前に退避した抽出結果と同じ ID（＝同じ内容）の担当範囲が復活したら、退避から戻して再利用する
     restorable = {i for i in ids if os.path.exists(os.path.join(stale_dir, f"{i}.json"))
                   and not os.path.exists(os.path.join(wp["extract_dir"], f"{i}.json"))}
     done = {s["id"] for s in slices if os.path.exists(os.path.join(wp["extract_dir"], f"{s['id']}.json"))} | restorable
@@ -183,7 +183,7 @@ def main():
     unassigned = len(inventory) - sum(len(s["entry_ids"]) for s in slices)
 
     if not a.dry_run:
-        # 現在のスライスに無い ID の抽出結果は _stale へ退避（消さない）。検証結果と作業票は破棄
+        # 現在の担当範囲に無い ID の抽出結果は _stale へ退避（消さない）。検証結果と指示書は破棄
         os.makedirs(wp["extract_dir"], exist_ok=True)
         for i in sorted(restorable):
             shutil.move(os.path.join(stale_dir, f"{i}.json"), os.path.join(wp["extract_dir"], f"{i}.json"))
@@ -204,14 +204,14 @@ def main():
                                  "outline_roles": sorted(outline_roles), "slices": slices})
         print(f"slices.json を出力: {wp['slices']}")
         if moved:
-            print(f"現在のスライスに対応しない抽出結果 {moved} 件を extract/_stale/ へ退避")
+            print(f"現在の担当範囲に対応しない抽出結果 {moved} 件を extract/_stale/ へ退避")
         if restorable:
-            print(f"内容が同じスライスの抽出結果 {len(restorable)} 件を extract/_stale/ から復元（要再検証）")
+            print(f"内容が同じ担当範囲の抽出結果 {len(restorable)} 件を extract/_stale/ から復元（要再検証）")
     else:
         print("（--dry-run: 何も書き換えていない）")
 
-    print(f"スライス {len(slices)} 件（上限 {a.max_lines} 行、平均 {sum(s['cost'] for s in slices) // max(1, len(slices))} 行）")
-    print(f"全文読み {full_lines} 行 / アウトライン読み {outline_cost} 行（{','.join(sorted(outline_roles)) or 'なし'}）")
+    print(f"担当範囲 {len(slices)} 件（上限 {a.max_lines} 行、平均 {sum(s['cost'] for s in slices) // max(1, len(slices))} 行）")
+    print(f"全文読み {full_lines} 行 / 抜粋読み {outline_cost} 行（{','.join(sorted(outline_roles)) or 'なし'}）")
     print(f"入口の割り当て: {len(inventory) - unassigned} / {len(inventory)} 件"
           + (f"（未割り当て {unassigned} 件: 読まない役割のファイルにある入口）" if unassigned else ""))
     print(f"抽出済み {len(done)} / 未抽出 {todo}")

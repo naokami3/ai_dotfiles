@@ -53,7 +53,7 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break
 <div class="wrap">
   <h1 id="title"></h1>
   <div class="sub" id="sub"></div>
-  <div class="note">正典は <code>features.json</code>。根拠（ファイル:行）は機械検証済みの引用にもとづく。確信度「推定」「不明」と「要確認」は、コードだけでは断定できなかった点であり人間による確認が必要。行をクリックすると詳細を表示する。</div>
+  <div class="note">元データは <code>features.json</code>。根拠（ファイル:行）は自動検証済みの引用にもとづく。確信度「推定」「不明」と「要確認」は、コードだけでは断定できなかった点であり人間による確認が必要。行をクリックすると詳細を表示する。</div>
   <div class="stats" id="stats"></div>
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="features" aria-selected="true">機能</button>
@@ -123,7 +123,7 @@ function detail(f){
   const locals = (f.local_summaries || []).length > 1 ? f.local_summaries.map(x => `<div><code>${esc(x.local_id)}</code> ${esc(x.summary)}</div>`).join('') : '';
   return `<dl><dt>概要</dt><dd>${esc(f.summary)}</dd>
     ${cons ? `<dt>制約（根拠）</dt><dd>${cons}</dd>` : ''}
-    ${locals ? `<dt>元の局所要約</dt><dd>${locals}</dd>` : ''}
+    ${locals ? `<dt>統合前の要約</dt><dd>${locals}</dd>` : ''}
     <dt>入口</dt><dd>${en}</dd>
     ${f.data.length ? `<dt>データ</dt><dd>${f.data.map(x => `<code>${esc(x)}</code>`).join(', ')}</dd>` : ''}
     ${f.external.length ? `<dt>外部連携</dt><dd>${esc(f.external.join(', '))}</dd>` : ''}

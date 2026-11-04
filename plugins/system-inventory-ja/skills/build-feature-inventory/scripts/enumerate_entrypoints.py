@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""入口分母（inventory.json）を作る。検出器 YAML の正規表現を機械的に実行するだけで、推測はしない。
+"""入口一覧（inventory.json）を作る。検出ルール YAML の正規表現を機械的に実行するだけで、推測はしない。
 
 使い方:
     python3 enumerate_entrypoints.py --work <作業ディレクトリ> --detectors <yaml> [<yaml>...]
         [--roles source,config]
 
-検出器 YAML の書式は ../references/detectors.md を参照。
+検出ルール YAML の書式は ../references/detectors.md を参照。
 既定では role が source / config のファイルだけを対象にする（テスト内の URL 文字列等を拾わないため）。
 依存: PyYAML（pip install pyyaml）。
 """
@@ -46,7 +46,7 @@ def load_rules(paths):
         if not os.path.exists(p):
             if any(c in p for c in "*?["):
                 continue  # シェルで展開されなかった glob（該当ファイルなし）
-            die(f"検出器ファイルが無い: {p}")
+            die(f"検出ルールファイルが無い: {p}")
         with open(p, encoding="utf-8") as f:
             doc = yaml.safe_load(f)
         det = doc.get("name") or os.path.splitext(os.path.basename(p))[0]
@@ -144,7 +144,7 @@ def main():
                 e["dup_of"] = f["dup_of"]
             entries.append(e)
 
-    # 除外したファイルにも検出器をかけ、入口候補があれば警告する（業務コードの誤除外の検知）
+    # 除外したファイルにも検出ルールをかけ、入口候補があれば警告する（業務コードの誤除外の検知）
     excluded_hits = []
     for e in manifest["excluded"]:
         if e["reason"] not in SCAN_EXCLUDED_REASONS:

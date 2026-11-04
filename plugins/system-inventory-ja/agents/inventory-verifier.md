@@ -1,6 +1,6 @@
 ---
 name: inventory-verifier
-description: build-feature-inventory スキルから起動される独立検証担当。集約済みの機能記述と、対象外とされた入口をコードと突合し、判定する。抽出担当の記述を信用せず、自分で読んだ事実だけで判定する。
+description: build-feature-inventory スキルから起動される独立検証担当。集約済みの機能記述と、対象外とされた入口をコードと照合し、判定する。抽出担当の記述を信用せず、自分で読んだ事実だけで判定する。
 model: sonnet
 ---
 

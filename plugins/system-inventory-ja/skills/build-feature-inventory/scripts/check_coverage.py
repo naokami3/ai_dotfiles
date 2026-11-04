@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""分母（ファイル・入口）に対する網羅率を集計する（coverage.json）。
+"""ファイル一覧・入口一覧に対する網羅率を集計する（coverage.json）。
 
-verify_evidence.py の結果を前提に、合格スライスだけを「読了済み」として数える。
-1ファイルが複数スライスに分割されている場合は、全区間が合格して初めて網羅済みとする。
+verify_evidence.py の結果を前提に、合格した担当範囲だけを「読了済み」として数える。
+1ファイルが複数の担当範囲に分割されている場合は、全区間が合格して初めて網羅済みとする。
 features.json と review/*.json があれば、確信度の内訳と独立検証の結果も集計する
 （features.json に存在しない feature_key の検証結果は、merge し直す前の古いものとして数えない）。
 ファイル網羅率が 100% 未満、または未対応の入口が残っていれば終了コード 1。
@@ -39,7 +39,7 @@ def main():
         status[s["id"]] = "missing" if v.get("missing") else ("passed" if v.get("ok") else "failed")
     passed = [s for s in slices if status[s["id"]] == "passed"]
 
-    # ファイル・行の網羅（ファイルの全区間が合格スライスにあるときだけ網羅済み）
+    # ファイル・行の網羅（ファイルの全区間が合格した担当範囲にあるときだけ網羅済み）
     skip = set(sl["skip_roles"])
     target = [f for f in manifest["files"] if f["role"] not in skip]
     canon = {f["path"]: f for f in target if "dup_of" not in f}
@@ -118,9 +118,9 @@ def main():
     pct = lambda n, d: f"{(100.0 * n / d):.1f}%" if d else "-"  # noqa: E731
     print(f"coverage.json を出力: {wp['coverage']}")
     st = report["slices"]
-    print(f"スライス: 合格 {st.get('passed', 0)} / 不合格 {st.get('failed', 0)} / 未抽出 {st.get('missing', 0)}（全 {st['total']}）")
+    print(f"担当範囲: 合格 {st.get('passed', 0)} / 不合格 {st.get('failed', 0)} / 未抽出 {st.get('missing', 0)}（全 {st['total']}）")
     print(f"ファイル網羅: {len(covered)}/{len(target)} ({pct(len(covered), len(target))})"
-          f"  うちアウトライン読み {outline_files} / 除外 {len(manifest['excluded'])}")
+          f"  うち抜粋読み {outline_files} / 除外 {len(manifest['excluded'])}")
     print(f"行（全文読み）: {read_full}/{total_lines} ({pct(read_full, total_lines)})")
     e = report["entries"]
     print(f"入口: 機能に対応 {e['in_features']} / 理由付き対象外 {e['unmapped_with_reason']} / 未対応 {len(open_entries)}"
@@ -130,9 +130,9 @@ def main():
               + " / 種別ごとの対象外率: " + ", ".join(f"{k} {v}" for k, v in e["unmapped_rate_by_kind"].items()))
     if report["excluded_candidates"]:
         print(f"※ 除外ファイル内の入口候補 {report['excluded_candidates']} 件（enumerate_entrypoints の警告を確認したか）")
-    print(f"局所機能 {local_total} 件（入口なし {no_entry}）")
+    print(f"集約前の機能 {local_total} 件（入口なし {no_entry}）")
     if missing:
-        print("分母に無かった入口の報告（検出器の見直し候補）: "
+        print("一覧に無かった入口の報告（検出ルールの見直し候補）: "
               + ", ".join(f"{k} {n}" for k, n in report["missing_entries_by_kind"].items()))
         for m in missing[:20]:
             print(f"  {m.get('kind')}: {m.get('label')} @ {m.get('path')}:{m.get('line')}")
