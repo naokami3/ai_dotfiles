@@ -171,7 +171,11 @@ def main():
                        "entry_ids": entry_ids, "read_checks": read_checks(items, h, lines_by_path)})
 
     ids = {s["id"] for s in slices}
-    done = {s["id"] for s in slices if os.path.exists(os.path.join(wp["extract_dir"], f"{s['id']}.json"))}
+    stale_dir = os.path.join(wp["extract_dir"], "_stale")
+    # 以前に退避した抽出結果と同じ ID（＝同じ内容）のスライスが復活したら、退避から戻して再利用する
+    restorable = {i for i in ids if os.path.exists(os.path.join(stale_dir, f"{i}.json"))
+                  and not os.path.exists(os.path.join(wp["extract_dir"], f"{i}.json"))}
+    done = {s["id"] for s in slices if os.path.exists(os.path.join(wp["extract_dir"], f"{s['id']}.json"))} | restorable
     todo_cost = sum(s["cost"] for s in slices if s["id"] not in done)
     todo = len(slices) - len(done)
     est = int(sum(s["cost"] for s in slices) * a.tokens_per_line + len(slices) * a.overhead)
@@ -180,8 +184,9 @@ def main():
 
     if not a.dry_run:
         # 現在のスライスに無い ID の抽出結果は _stale へ退避（消さない）。検証結果と作業票は破棄
-        stale_dir = os.path.join(wp["extract_dir"], "_stale")
         os.makedirs(wp["extract_dir"], exist_ok=True)
+        for i in sorted(restorable):
+            shutil.move(os.path.join(stale_dir, f"{i}.json"), os.path.join(wp["extract_dir"], f"{i}.json"))
         moved = 0
         for fn in os.listdir(wp["extract_dir"]):
             if fn.endswith(".json") and fn[:-5] not in ids:
@@ -200,6 +205,8 @@ def main():
         print(f"slices.json を出力: {wp['slices']}")
         if moved:
             print(f"現在のスライスに対応しない抽出結果 {moved} 件を extract/_stale/ へ退避")
+        if restorable:
+            print(f"内容が同じスライスの抽出結果 {len(restorable)} 件を extract/_stale/ から復元（要再検証）")
     else:
         print("（--dry-run: 何も書き換えていない）")
 

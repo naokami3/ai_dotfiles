@@ -68,7 +68,7 @@ def main():
                 no_entry += 1
         for u in d.get("unmapped_entries", []):
             unmapped[u["entry_id"]] = u
-        missing += d.get("missing_entries", [])
+        missing += [{**m, "slice": s["id"]} for m in d.get("missing_entries", [])]
     all_ids = {e["id"] for e in ents}
     assigned = {eid for s in slices for eid in s["entry_ids"]}
     open_entries = [e["id"] for e in ents if e["id"] not in mapped and e["id"] not in unmapped]
@@ -94,6 +94,7 @@ def main():
         "excluded_candidates": len(inv.get("excluded_candidates", [])),
         "local_features": {"total": local_total, "without_entry": no_entry},
         "missing_entries_by_kind": dict(collections.Counter(m.get("kind") for m in missing)),
+        "missing_entries": [{k: m.get(k) for k in ("kind", "label", "path", "line", "slice")} for m in missing[:200]],
     }
 
     keys = set()
@@ -133,6 +134,10 @@ def main():
     if missing:
         print("分母に無かった入口の報告（検出器の見直し候補）: "
               + ", ".join(f"{k} {n}" for k, n in report["missing_entries_by_kind"].items()))
+        for m in missing[:20]:
+            print(f"  {m.get('kind')}: {m.get('label')} @ {m.get('path')}:{m.get('line')}")
+        if len(missing) > 20:
+            print(f"  …ほか {len(missing) - 20} 件は coverage.json の missing_entries")
     if "features" in report:
         f = report["features"]
         print(f"features.json: ドメイン {f['domains']} / 機能 {f['total']} / 確信度 {f['by_confidence']}"
