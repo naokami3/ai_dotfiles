@@ -1,6 +1,6 @@
-# FastAPI の入口検出ルール
-# パスはルーター内の相対パス。APIRouter(prefix=...) / include_router(prefix=...) による
-# 最終的な URL の合成は正規表現では解決しないため、抽出担当がコードを読んで機能側に書く。
+# FastAPI のエントリーポイント検出ルール
+# 同じファイルの APIRouter(prefix=...) はパスの前に付ける。include_router(prefix=...) や
+# アプリ全体のプレフィックス（例: /api/v1）は別ファイルにあるため正規表現では解決せず、付かない。
 name: fastapi
 rules:
   - id: fastapi-route
@@ -8,7 +8,8 @@ rules:
     files: ["**/*.py"]
     # パスは文字列リテラル・定数（@router.get(ITEMS_PATH)）・省略のいずれでも拾う
     pattern: '^[ \t]*@(?P<obj>\w+)\.(?P<method>get|post|put|patch|delete|head|options|api_route)\(\s*(?:path\s*=\s*)?(?:[rf]?["''](?P<path>[^"'']*)["'']|(?P<const>[A-Za-z_][\w.]*))?'
-    label: "{method|upper} {path}{const} ({obj})"
+    context: '^(?P<obj>\w+)\s*=\s*APIRouter\([^)]*?\bprefix\s*=\s*["''](?P<prefix>[^"'']*)["'']'
+    label: "{method|upper} {prefix}{path}{const} ({obj})"
 
   - id: fastapi-websocket
     kind: http_endpoint

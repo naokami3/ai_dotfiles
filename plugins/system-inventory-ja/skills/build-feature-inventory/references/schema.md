@@ -8,7 +8,7 @@
 | ファイル | 作る人 | 内容 |
 |---|---|---|
 | `files.json` | `build_file_manifest.py` | ファイル一覧・除外一覧 |
-| `inventory.json` | `enumerate_entrypoints.py` | 入口一覧・除外ファイル内の入口候補 |
+| `inventory.json` | `enumerate_entrypoints.py` | エントリーポイント一覧・除外ファイル内のエントリーポイント候補 |
 | `slices.json` | `plan_slices.py` | 担当範囲定義（ID は内容ハッシュ由来）・読了確認の窓 |
 | `briefs/<S>.md` | `slice_brief.py` | 抽出担当への指示書 |
 | `extract/<S>.json` | 抽出担当エージェント | 担当範囲ごとの集約前の機能（下記） |
@@ -45,7 +45,10 @@
         {"path": "backend/app/api/routes/items.py", "line": 13, "quote": "@router.get(\"/\", response_model=ItemsPublic)"},
         {"path": "backend/app/api/routes/items.py", "line": 22, "quote": "if current_user.is_superuser:"}
       ],
-      "open_questions": []
+      "open_questions": [
+        {"question": "削除時に関連する添付ファイルも消えるかは、呼び出し先 storage.delete_item_files がこの担当範囲外のため未確認",
+         "how_to_check": "app/services/storage.py の delete_item_files を読み、添付ファイルの削除処理があるか確かめる"}
+      ]
     }
   ],
   "unmapped_entries": [
@@ -69,20 +72,35 @@
 | `summary` | 誰が・何をできるか。コードで確認したことだけを書く |
 | `actors` | 利用者の種類。**各要素に根拠（`evidence` の番号、0 始まり）を付ける** |
 | `constraints` | 権限・条件・禁止事項（「〜のみ」「〜できない」等）。**各要素に根拠の番号を付ける**。summary に制約を書いたら必ずここにも書く |
-| `entry_ids` | 指示書の入口 ID。入口の無い内部処理なら空配列 |
+| `entry_ids` | 指示書のエントリーポイント ID。エントリーポイントの無い内部処理なら空配列 |
 | `data` | 読み書きするテーブル・コレクション・主要なファイル |
 | `external` | 外部サービス・他システム（メール送信、決済、S3 等） |
 | `confidence` | 下の基準 |
 | `evidence` | 1件以上必須。`quote` はその行に**実際に書かれている** 8 文字以上の断片（短い行は行全体）をそのまま写す |
-| `open_questions` | コードだけでは断定できなかった点。`inferred` / `unknown` では必須 |
-| `unmapped_entries` | 機能に対応付けない入口と、`reason_code`（下表）・具体的な理由 |
-| `missing_entries` | 読んでいて見つけた、指示書に無い入口。`kind` は `references/detectors.md` の種別（該当なしは `other`） |
+| `open_questions` | コードだけでは断定できなかった点。`inferred` / `unknown` では必須。1件ずつ `question`（何が未確認か）と `how_to_check`（どう確かめるか）を書く（下記） |
+| `unmapped_entries` | 機能に対応付けないエントリーポイントと、`reason_code`（下表）・具体的な理由 |
+| `missing_entries` | 読んでいて見つけた、指示書に無いエントリーポイント。`kind` は `references/detectors.md` の種別（該当なしは `other`） |
+
+### 要確認事項（open_questions）の書き方
+
+読んだ人がそのまま確認作業に移れるように、1件ずつ次の2つを書く。どちらも 8 文字以上。
+
+| 項目 | 書くこと |
+|---|---|
+| `question` | 何が未確認か。対象（機能・処理）と、分からない点、分からない理由（担当範囲外・設定値次第など）を書く |
+| `how_to_check` | どう確かめるか。次のいずれかを具体的に書く |
+
+- **コードで確かめられる**: 読むファイル・関数（例: 「`app/core/config.py` の `EMAILS_ENABLED` の既定値を確認する」）
+- **動かして確かめる**: 環境と操作（例: 「一般ユーザーでログインし、他人のアイテムの URL を直接開いて 403 になるか確かめる」）
+- **人に聞く必要がある**: 誰に何を聞くか（例: 「運用担当に、本番で SMTP 設定が有効かを確認する」）
+
+「確認する」「調査が必要」だけの書き方は不可。
 
 ### 確信度の基準
 
 | 値 | 基準 |
 |---|---|
-| `confirmed` | 入口から主要な処理・データ操作までをこの担当範囲のコードで確認した |
+| `confirmed` | エントリーポイントから主要な処理・データ操作までをこの担当範囲のコードで確認した |
 | `inferred` | 一部（担当範囲外の呼び出し先、設定値による有効/無効など）を推定で補った。補った点を `open_questions` に書く |
 | `unknown` | コードは存在するが、目的や使われているかを断定できない。理由を `open_questions` に書く |
 
@@ -93,17 +111,17 @@
 | `health_check` | 死活監視・ヘルスチェック |
 | `dev_tool` | 開発環境専用・開発支援 |
 | `ops_script` | リポジトリ運用・リリース・CI |
-| `test_support` | テスト用の入口 |
+| `test_support` | テスト用のエントリーポイント |
 | `framework_internal` | フレームワークの仕組み（ミドルウェア、マウント等）で業務機能ではない |
 | `data_definition` | テーブル定義・マイグレーション（関連する機能の `data` に反映済み） |
-| `duplicate` | 同じ入口の重複定義 |
+| `duplicate` | 同じエントリーポイントの重複定義 |
 | `dead_code` | 使われていない疑い（呼び出し元・ルーティング登録が見つからない） |
 | `other` | 上のいずれでもない（reason に具体的に書く） |
 
 ## grouping.json（進行役が書く）
 
 `digest.txt` だけを見て書く。**書けるのは名前・グループ分け・sources・利用者表記の写像と、
-複数 sources をまとめた機能の統合要約だけ。** 入口・データ・根拠・制約・確信度は `merge` が sources から引き継ぐ。
+複数 sources をまとめた機能の統合要約だけ。** エントリーポイント・データ・根拠・制約・確信度は `merge` が sources から引き継ぐ。
 
 ```json
 {
@@ -132,7 +150,7 @@
 ## review-batches/bNN.json（`features.py sample` が書く）と review/bNN.json（検証担当が書く）
 
 バッチには `repo`（対象リポジトリ）、`output`（結果の書き込み先）、`items` が入る。
-items は `type: feature`（機能）と `type: unmapped_entry`（対象外にした入口）の2種類。
+items は `type: feature`（機能）と `type: unmapped_entry`（対象外にしたエントリーポイント）の2種類。
 
 ```json
 {

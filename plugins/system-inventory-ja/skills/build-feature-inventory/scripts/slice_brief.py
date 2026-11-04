@@ -5,7 +5,7 @@
 - 全文を読むファイルと行範囲（抽出担当が Read ツールで読む）
 - 読了確認の窓（各窓から1行ずつ引用させる。スクリプトが決めた区間なので、読まずには答えにくい）
 - 抜粋読みのファイルは、定義行・テスト名だけをここで展開済み（Read 不要）
-- この担当範囲に割り当てられた入口（すべて features か unmapped_entries に対応付ける）
+- この担当範囲に割り当てられたエントリーポイント（すべて features か unmapped_entries に対応付ける）
 - 修正依頼: 前回の自動検証のエラー、または独立検証の指摘
 
 使い方:
@@ -18,7 +18,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, outline_lines, read_lines, work_paths  # noqa: E402
 
 
 def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
@@ -57,7 +57,7 @@ def brief(wp, repo, s, entries, fix_errors=None, review_notes=None):
             L.append(f"### {i['path']}")
             L += [f"{n}: {t.strip()[:160]}" for n, t in outline_lines(read_lines(repo, i["path"]))]
             L.append("")
-    L += [f"## この担当範囲の入口（{len(s['entry_ids'])} 件。全件を対応付ける）", ""]
+    L += [f"## この担当範囲のエントリーポイント（{len(s['entry_ids'])} 件。全件を対応付ける）", ""]
     for eid in s["entry_ids"]:
         e = entries.get(eid, {})
         note = f"（{e['dup_of']} と同一内容）" if e.get("dup_of") else ""
@@ -87,6 +87,7 @@ def main():
     entries = {e["id"]: e for e in load_json(wp["inventory"])["entries"]} \
         if os.path.exists(wp["inventory"]) else {}
     bdir = os.path.join(a.work, "briefs")
+    copy_schema(a.work)
 
     if a.slice:
         s = by_id.get(a.slice) or die(f"担当範囲 {a.slice} が無い")

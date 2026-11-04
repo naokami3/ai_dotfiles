@@ -121,6 +121,22 @@ def norm_ws(s):
     return re.sub(r"\s+", " ", s).strip()
 
 
+def norm_question(q):
+    """要確認事項を {"question", "how_to_check"} にそろえる（旧形式の文字列も受け付ける）"""
+    if isinstance(q, dict):
+        return {"question": str(q.get("question") or "").strip(), "how_to_check": str(q.get("how_to_check") or "").strip()}
+    return {"question": str(q).strip(), "how_to_check": ""}
+
+
+def copy_schema(work):
+    """スキーマを W/schema.md に写す。抽出・検証担当が触る場所を R と W の2か所に限り、
+    プラグインのキャッシュへの読み取り許可を不要にするため"""
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references", "schema.md")
+    os.makedirs(work, exist_ok=True)
+    with open(src, encoding="utf-8") as f, open(os.path.join(work, "schema.md"), "w", encoding="utf-8", newline="\n") as g:
+        g.write(f.read())
+
+
 def work_paths(work):
     return {
         "files": os.path.join(work, "files.json"),
@@ -137,7 +153,7 @@ def work_paths(work):
 def load_reviews(wp, keys):
     """独立検証の結果を読む。features.json に存在する feature_key を指すものだけを有効とする。
 
-    返り値: (機能の結果 {key: r}, 対象外の入口の結果 {entry_id: r}, 無視した古い結果の件数)
+    返り値: (機能の結果 {key: r}, 対象外のエントリーポイントの結果 {entry_id: r}, 無視した古い結果の件数)
     """
     import glob
     feats, ents, stale = {}, {}, 0

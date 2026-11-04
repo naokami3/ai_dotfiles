@@ -57,34 +57,52 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break
   <div class="stats" id="stats"></div>
   <div class="tabs" role="tablist">
     <button role="tab" data-tab="features" aria-selected="true">機能</button>
-    <button role="tab" data-tab="entries" aria-selected="false">入口</button>
+    <button role="tab" data-tab="apis" aria-selected="false">API</button>
+    <button role="tab" data-tab="screens" aria-selected="false">画面</button>
+    <button role="tab" data-tab="entries" aria-selected="false">エントリーポイント</button>
     <button role="tab" data-tab="questions" aria-selected="false">要確認</button>
     <button role="tab" data-tab="coverage" aria-selected="false">網羅・対象外</button>
   </div>
 
   <section id="tab-features">
     <div class="bar">
-      <input id="q" type="search" placeholder="機能名・概要・入口・データで検索">
+      <input id="q" type="search" placeholder="機能名・概要・エントリーポイント・データで検索">
       <select id="fdom"><option value="">すべてのドメイン</option></select>
       <select id="fconf"><option value="">すべての確信度</option><option value="confirmed">確認済み</option><option value="inferred">推定</option><option value="unknown">不明</option></select>
-      <select id="fent"><option value="">入口: すべて</option><option value="yes">入口あり</option><option value="no">入口なし</option></select>
+      <select id="fent"><option value="">エントリーポイント: すべて</option><option value="yes">エントリーポイントあり</option><option value="no">エントリーポイントなし</option></select>
       <span class="count" id="fcount"></span>
     </div>
-    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>概要</th><th>利用者</th><th>入口</th><th>データ</th><th>確信度</th></tr></thead><tbody id="ftb"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>概要</th><th>利用者</th><th>エントリーポイント</th><th>データ</th><th>確信度</th></tr></thead><tbody id="ftb"></tbody></table></div>
+  </section>
+
+  <section id="tab-apis" hidden>
+    <div class="bar">
+      <input id="aq" type="search" placeholder="API・概要・ファイルで検索">
+      <span class="count" id="acount"></span>
+    </div>
+    <div class="tw"><table><thead><tr><th>API</th><th>概要</th><th>ソースコード</th><th>ドメイン</th><th>機能ID</th></tr></thead><tbody id="atb"></tbody></table></div>
+  </section>
+
+  <section id="tab-screens" hidden>
+    <div class="bar">
+      <input id="sq" type="search" placeholder="画面名・URL・ファイルで検索">
+      <span class="count" id="scount"></span>
+    </div>
+    <div class="tw"><table><thead><tr><th>画面名</th><th>URL</th><th>ソースコード</th><th>ドメイン</th><th>機能ID</th></tr></thead><tbody id="stb"></tbody></table></div>
   </section>
 
   <section id="tab-entries" hidden>
     <div class="bar">
-      <input id="eq" type="search" placeholder="入口・ファイル・機能名で検索">
+      <input id="eq" type="search" placeholder="エントリーポイント・ファイル・機能名で検索">
       <select id="ekind"><option value="">すべての種別</option></select>
       <select id="emap"><option value="">すべて</option><option value="mapped">機能に対応</option><option value="unmapped">未分類</option></select>
       <span class="count" id="ecount"></span>
     </div>
-    <div class="tw"><table><thead><tr><th>種別</th><th>入口</th><th>場所</th><th>機能</th></tr></thead><tbody id="etb"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>種別</th><th>エントリーポイント</th><th>場所</th><th>機能</th></tr></thead><tbody id="etb"></tbody></table></div>
   </section>
 
   <section id="tab-questions" hidden>
-    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>要確認事項</th></tr></thead><tbody id="qtb"></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>ID</th><th>機能</th><th>未確認の点</th><th>確認方法</th></tr></thead><tbody id="qtb"></tbody></table></div>
   </section>
 
   <section id="tab-coverage" hidden>
@@ -118,13 +136,13 @@ function featText(f){ return [f.id, f.name, f.summary, f.actors.join(' '), f.ent
 function detail(f){
   const ev = f.evidence.map(e => `<div><code>${esc(e.path)}:${e.line}</code> — <code>${esc(e.quote)}</code></div>`).join('');
   const en = f.entries.map(e => `<div><span class="chip">${esc(KIND[e.kind] || e.kind)}</span> <code>${esc(e.label)}</code></div>`).join('') || 'なし';
-  const qs = f.open_questions.map(q => `<div class="q">・${esc(q)}</div>`).join('');
+  const qs = f.open_questions.map(q => `<div class="q">・${esc(q.question)}</div><div style="margin-left:1em">確認方法: ${esc(q.how_to_check || '（未記載）')}</div>`).join('');
   const cons = (f.constraint_texts || []).map(c => `<div>・${esc(c)}</div>`).join('');
   const locals = (f.local_summaries || []).length > 1 ? f.local_summaries.map(x => `<div><code>${esc(x.local_id)}</code> ${esc(x.summary)}</div>`).join('') : '';
   return `<dl><dt>概要</dt><dd>${esc(f.summary)}</dd>
     ${cons ? `<dt>制約（根拠）</dt><dd>${cons}</dd>` : ''}
     ${locals ? `<dt>統合前の要約</dt><dd>${locals}</dd>` : ''}
-    <dt>入口</dt><dd>${en}</dd>
+    <dt>エントリーポイント</dt><dd>${en}</dd>
     ${f.data.length ? `<dt>データ</dt><dd>${f.data.map(x => `<code>${esc(x)}</code>`).join(', ')}</dd>` : ''}
     ${f.external.length ? `<dt>外部連携</dt><dd>${esc(f.external.join(', '))}</dd>` : ''}
     <dt>根拠</dt><dd>${ev}</dd>
@@ -156,7 +174,7 @@ function renderF(){
 $('ftb').addEventListener('click', e => { const tr = e.target.closest('tr.f'); if (!tr) return; const id = tr.dataset.id; open.has(id) ? open.delete(id) : open.add(id); renderF(); });
 ['q', 'fdom', 'fconf', 'fent'].forEach(id => $(id).addEventListener('input', renderF));
 
-// 入口
+// エントリーポイント
 [...new Set(D.entries.map(e => e.kind))].forEach(k => $('ekind').insertAdjacentHTML('beforeend', `<option value="${esc(k)}">${esc(KIND[k] || k)}</option>`));
 function renderE(){
   const q = $('eq').value.trim().toLowerCase(), k = $('ekind').value, m = $('emap').value;
@@ -169,9 +187,28 @@ function renderE(){
 }
 ['eq', 'ekind', 'emap'].forEach(id => $(id).addEventListener('input', renderE));
 
-$('qtb').innerHTML = D.questions.map(r => `<tr><td class="id">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="q">${esc(r[2])}</td></tr>`).join('') || '<tr><td colspan="3">なし</td></tr>';
+// API・画面（エントリーポイントのうち API と画面だけを、対応する機能名と並べる）
+function listRows(rows, q){
+  return rows.filter(r => !q || [r.label, r.path, r.reason, r.features.map(f => f.id + ' ' + f.name + ' ' + f.domain).join(' ')].join(' ').toLowerCase().includes(q));
+}
+const fname = r => r.features.length ? r.features.map(f => esc(f.name)).join('<br>') : `<span class="q">機能に対応しない: ${esc(r.reason)}</span>`;
+const fcol = (r, k) => r.features.map(f => esc(f[k])).join('<br>');
+function renderA(){
+  const rows = listRows(D.apis, $('aq').value.trim().toLowerCase());
+  $('atb').innerHTML = rows.map(r => `<tr><td><code>${esc(r.label)}</code></td><td>${fname(r)}</td><td><code>${esc(r.path)}:${r.line}</code></td><td>${fcol(r, 'domain')}</td><td class="id">${fcol(r, 'id')}</td></tr>`).join('') || '<tr><td colspan="5">該当なし</td></tr>';
+  $('acount').textContent = rows.length + ' 件';
+}
+function renderS(){
+  const rows = listRows(D.screens, $('sq').value.trim().toLowerCase());
+  $('stb').innerHTML = rows.map(r => `<tr><td>${fname(r)}</td><td><code>${esc(r.label)}</code></td><td><code>${esc(r.path)}:${r.line}</code></td><td>${fcol(r, 'domain')}</td><td class="id">${fcol(r, 'id')}</td></tr>`).join('') || '<tr><td colspan="5">該当なし</td></tr>';
+  $('scount').textContent = rows.length + ' 件';
+}
+$('aq').addEventListener('input', renderA);
+$('sq').addEventListener('input', renderS);
+
+$('qtb').innerHTML = D.questions.map(r => `<tr><td class="id">${esc(r[0])}</td><td>${esc(r[1])}</td><td class="q">${esc(r[2])}</td><td>${esc(r[3])}</td></tr>`).join('') || '<tr><td colspan="4">なし</td></tr>';
 $('ctb').innerHTML = D.overview.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('');
-renderF(); renderE();
+renderF(); renderE(); renderA(); renderS();
 })();
 </script>
 </body>

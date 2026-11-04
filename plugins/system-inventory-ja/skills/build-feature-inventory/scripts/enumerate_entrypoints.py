@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""入口一覧（inventory.json）を作る。検出ルール YAML の正規表現を機械的に実行するだけで、推測はしない。
+"""エントリーポイント一覧（inventory.json）を作る。検出ルール YAML の正規表現を機械的に実行するだけで、推測はしない。
 
 使い方:
     python3 enumerate_entrypoints.py --work <作業ディレクトリ> --detectors <yaml> [<yaml>...]
@@ -65,6 +65,7 @@ def load_rules(paths):
                     "exclude": GlobSet(r.get("exclude") or []),
                     "path_re": re.compile(r["path_pattern"]) if r.get("path_pattern") else None,
                     "re": re.compile(r["pattern"], re.MULTILINE) if r.get("pattern") else None,
+                    "context": re.compile(r["context"], re.MULTILINE) if r.get("context") else None,
                     "label": r.get("label") or "{match}",
                     "normalize": [(re.compile(x[0]), x[1]) for x in r.get("normalize") or []],
                 })
@@ -97,7 +98,18 @@ def scan(repo, path, rules):
                 hits.append((line, g))
         else:
             hits.append((1, dict(pgroups, match=path)))
+        # context: ファイル内で1回だけ探す補助の正規表現（例: APIRouter(prefix=...)）。
+        # 本体のマッチと同名のグループがあれば、値が一致するマッチにだけ使う（別のルーターに付けない）
+        ctx = {}
+        if r["context"] and hits:
+            if text is None:
+                text = read_text(repo, path)
+            cm = r["context"].search(text)
+            ctx = {k: v for k, v in cm.groupdict().items() if v is not None} if cm else {}
         for line, g in hits:
+            if ctx and all(g.get(k, v) == v for k, v in ctx.items()):
+                for k, v in ctx.items():
+                    g.setdefault(k, v)
             g["file"] = path
             label = render_label(r["label"], g)
             for rx, rep in r["normalize"]:
@@ -144,7 +156,7 @@ def main():
                 e["dup_of"] = f["dup_of"]
             entries.append(e)
 
-    # 除外したファイルにも検出ルールをかけ、入口候補があれば警告する（業務コードの誤除外の検知）
+    # 除外したファイルにも検出ルールをかけ、エントリーポイント候補があれば警告する（業務コードの誤除外の検知）
     excluded_hits = []
     for e in manifest["excluded"]:
         if e["reason"] not in SCAN_EXCLUDED_REASONS:
@@ -163,7 +175,7 @@ def main():
                                 "rule_stats": rule_stats, "entries": entries,
                                 "excluded_candidates": excluded_hits})
 
-    print(f"inventory.json を出力: {wp['inventory']}（入口 {len(entries)} 件 / 対象 {len(targets)} ファイル）")
+    print(f"inventory.json を出力: {wp['inventory']}（エントリーポイント {len(entries)} 件 / 対象 {len(targets)} ファイル）")
     by_kind = collections.Counter(e["kind"] for e in entries)
     print("種別: " + ", ".join(f"{k} {n}" for k, n in by_kind.most_common()))
     print("ルール別（1件以上）:")
@@ -176,7 +188,7 @@ def main():
     if excluded_hits:
         by_dir = collections.Counter((h["path"].rsplit("/", 1)[0] if "/" in h["path"] else "(root)", h["reason"])
                                      for h in excluded_hits)
-        print(f"※ 除外したファイルの中に入口候補が {len(excluded_hits)} 件ある。業務コードを除外していないか確認し、"
+        print(f"※ 除外したファイルの中にエントリーポイント候補が {len(excluded_hits)} 件ある。業務コードを除外していないか確認し、"
               "必要なら build_file_manifest.py --include で戻す:")
         for (d, rsn), n in by_dir.most_common(20):
             print(f"  {d}/ ({rsn}) {n}件")

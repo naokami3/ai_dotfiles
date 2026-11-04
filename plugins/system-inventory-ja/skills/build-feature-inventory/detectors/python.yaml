@@ -1,4 +1,4 @@
-# Python 全般（Web フレームワーク以外）の入口検出ルール: ジョブ・CLI・データモデル・メッセージ購読
+# Python 全般（Web フレームワーク以外）のエントリーポイント検出ルール: ジョブ・CLI・データモデル・メッセージ購読
 name: python
 rules:
   - id: celery-task

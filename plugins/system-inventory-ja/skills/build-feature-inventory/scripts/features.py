@@ -7,13 +7,13 @@ digest  合格済みの集約前の機能を 1 機能 1 行に圧縮した要約
         --prefix は集約前の機能の根拠ファイルのパスで絞る（同じ集約前の機能が複数の要約一覧に重複しない）
 
 merge   集約担当が書いた grouping（名前・グループ分け・sources・actor_map、複数 sources の統合要約だけ）
-        から features.json を作る。入口・データ・根拠・制約・確信度・要確認事項は sources から機械的に
+        から features.json を作る。エントリーポイント・データ・根拠・制約・確信度・要確認事項は sources から機械的に
         引き継ぐ。sources が1件の機能は集約前の要約をそのまま使う（統合文を書かせない）。
         grouping は複数ファイルを渡せる（ドメインごとに分けて作った場合）。
             python3 features.py merge --work W --grouping W/grouping.json [W/grouping-2.json ...]
 
 sample  独立検証の対象をリスク順に選び、検証担当に渡すバッチファイルを書く。
-        対象外にした入口（unmapped）の抜き取りも含める。
+        対象外にしたエントリーポイント（unmapped）の抜き取りも含める。
             python3 features.py sample --work W [--n 15] [--entries 10] [--batch-size 5] [--seed 0]
 """
 import argparse
@@ -26,7 +26,7 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import die, load_json, save_json, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, norm_question, save_json, work_paths  # noqa: E402
 
 CONF_RANK = {"unknown": 0, "inferred": 1, "confirmed": 2}
 
@@ -83,7 +83,7 @@ def cmd_digest(a, wp):
                 f["local_id"], f["name"], f.get("summary") or "",
                 f"利用者: {', '.join(actor_names(f)) or '-'}",
                 f"制約: {'; '.join(cons) or '-'}",
-                f"入口: {ent or 'なし'}", f"data: {', '.join(f.get('data', [])[:5]) or '-'}",
+                f"エントリーポイント: {ent or 'なし'}", f"data: {', '.join(f.get('data', [])[:5]) or '-'}",
                 f.get("confidence", "?")]))
     out = a.out or os.path.join(a.work, "digest.txt")
     with open(out, "w", encoding="utf-8", newline="\n") as fp:
@@ -180,7 +180,7 @@ def cmd_merge(a, wp):
                             for e in entry_ids],
                 "data": union(x for f in src for x in f.get("data") or []),
                 "external": union(x for f in src for x in f.get("external") or []),
-                "evidence": union(evidence), "open_questions": union(q for f in src for q in f.get("open_questions") or []),
+                "evidence": union(evidence), "open_questions": union(norm_question(q) for f in src for q in f.get("open_questions") or []),
                 "local_summaries": [{"local_id": f["local_id"], "name": f.get("name", ""), "summary": f.get("summary", "")}
                                     for f in src],
             })
@@ -222,7 +222,7 @@ def cmd_merge(a, wp):
     print(f"features.json を出力: {wp['features']}")
     print(f"ドメイン {len(domains)} / 機能 {fno} / 集約前の機能 {len(local)}（重複配置 {len(multi)}）"
           + ("（途中経過: 未合格の担当範囲あり）" if ng else ""))
-    print(f"未分類の入口 {len(unclassified)} 件 / 一覧に無かった入口の報告 {len(missing_entries)} 件")
+    print(f"未分類のエントリーポイント {len(unclassified)} 件 / 一覧に無かったエントリーポイントの報告 {len(missing_entries)} 件")
 
 
 def cmd_sample(a, wp):
@@ -249,6 +249,7 @@ def cmd_sample(a, wp):
     ent_pick = un[:a.entries]
 
     bdir = os.path.join(a.work, "review-batches")
+    copy_schema(a.work)
     if os.path.isdir(bdir):
         shutil.rmtree(bdir)
     items = [{"type": "feature", "feature_key": f["key"], "feature_id": f["id"], "name": f["name"],
@@ -264,7 +265,7 @@ def cmd_sample(a, wp):
         nb += 1
         save_json(os.path.join(bdir, f"b{nb:02d}.json"), {"repo": repo, "output": os.path.join(wp["review_dir"], f"b{nb:02d}.json"),
                                                           "items": items[i:i + a.batch_size]})
-    print(f"独立検証のバッチを出力: {bdir}（{nb} バッチ / 機能 {len(pick)} 件（高リスク {k_high}）+ 対象外の入口 {len(ent_pick)} 件 / 全 {len(feats)} 機能）")
+    print(f"独立検証のバッチを出力: {bdir}（{nb} バッチ / 機能 {len(pick)} 件（高リスク {k_high}）+ 対象外のエントリーポイント {len(ent_pick)} 件 / 全 {len(feats)} 機能）")
 
 
 def main():
