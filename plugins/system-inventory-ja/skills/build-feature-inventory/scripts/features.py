@@ -15,18 +15,24 @@ merge   集約担当が書いた grouping（名前・グループ分け・source
 sample  独立検証の対象をリスク順に選び、検証担当に渡すバッチファイルを書く。
         対象外にしたエントリーポイント（unmapped）の抜き取りも含める。
             python3 features.py sample --work W [--n 15] [--entries 10] [--batch-size 5] [--seed 0]
+
+questions  要確認事項のうち、文面（確認方法）から読むべきファイルが特定できるものを選び、
+        回答担当に渡すバッチファイル（question-batches/qNN.json）を書く。回答済みのものは除く。
+            python3 features.py questions --work W [--batch-size 8] [--redo]
 """
 import argparse
 import collections
+import glob
 import hashlib
 import os
 import random
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import copy_schema, die, load_json, norm_question, save_json, work_paths  # noqa: E402
+from _common import copy_schema, die, load_json, norm_question, question_id, save_json, work_paths  # noqa: E402
 
 CONF_RANK = {"unknown": 0, "inferred": 1, "confirmed": 2}
 
@@ -268,6 +274,72 @@ def cmd_sample(a, wp):
     print(f"独立検証のバッチを出力: {bdir}（{nb} バッチ / 機能 {len(pick)} 件（高リスク {k_high}）+ 対象外のエントリーポイント {len(ent_pick)} 件 / 全 {len(feats)} 機能）")
 
 
+PATH_TOKEN = re.compile(r"[A-Za-z0-9_.@\[\]()-]+(?:/[A-Za-z0-9_.@\[\]()-]+)*/?")
+
+
+def referenced_files(text, known):
+    """要確認事項の文面に出てくるファイル・ディレクトリを、ファイル一覧の実在パスに解決する。
+    完全一致 → 末尾一致（a/b.ts が x/a/b.ts に一致）→ ディレクトリ（components/Admin/ 配下）の順に探す"""
+    out = []
+    for tok in PATH_TOKEN.findall(text):
+        tok = tok.strip("./()[]")
+        if len(tok) < 4 or ("/" not in tok and "." not in tok):
+            continue  # 拡張子もディレクトリ区切りも無い語は単語として扱う
+        if tok in known:
+            hits = [tok]
+        elif "." in os.path.basename(tok) and not tok.endswith("/"):
+            hits = [p for p in known if p == tok or p.endswith("/" + tok)]
+        else:
+            d = tok.rstrip("/") + "/"
+            hits = [p for p in known if p.startswith(d) or ("/" + d) in p]
+            if not hits:  # 拡張子を省いたファイル名（hooks/useAuth → frontend/src/hooks/useAuth.ts）
+                stem = tok.rstrip("/")
+                hits = [p for p in known if os.path.splitext(p)[0] == stem or os.path.splitext(p)[0].endswith("/" + stem)]
+        if 0 < len(hits) <= 10:  # 曖昧すぎる語（多数に一致）は使わない
+            out += [h for h in sorted(hits) if h not in out]
+    return out[:12]
+
+
+def cmd_questions(a, wp):
+    """要確認事項のうち、確認方法に読むべきファイルが特定できるものを回答担当へのバッチにする"""
+    fd = load_json(wp["features"])
+    known = {f["path"] for f in load_json(wp["files"])["files"]}
+    repo = load_json(wp["files"])["repo"]
+    answered = {}
+    if os.path.isdir(wp["answers_dir"]) and not a.redo:
+        for ap_ in glob.glob(os.path.join(wp["answers_dir"], "*.json")):
+            for r in load_json(ap_).get("answers", []):
+                answered[r.get("question_id")] = r
+    items, no_code, done = [], 0, 0
+    for d in fd["domains"]:
+        for f in d["features"]:
+            for q in f.get("open_questions") or []:
+                q = norm_question(q)
+                qid = question_id(f["key"], q["question"])
+                if qid in answered:
+                    done += 1
+                    continue
+                files = referenced_files(q["question"] + "\n" + q["how_to_check"], known)
+                if not files:
+                    no_code += 1  # 動かす・人に聞く確認。コードでは解消しない
+                    continue
+                items.append({"question_id": qid, "feature_key": f["key"], "feature_id": f["id"],
+                              "feature_name": f["name"], "feature_summary": f["summary"],
+                              "question": q["question"], "how_to_check": q["how_to_check"], "files": files})
+    bdir = os.path.join(a.work, "question-batches")
+    if os.path.isdir(bdir):
+        shutil.rmtree(bdir)
+    copy_schema(a.work)
+    nb = 0
+    for i in range(0, len(items), a.batch_size):
+        nb += 1
+        save_json(os.path.join(bdir, f"q{nb:02d}.json"),
+                  {"repo": repo, "output": os.path.join(wp["answers_dir"], f"q{nb:02d}.json"),
+                   "items": items[i:i + a.batch_size]})
+    print(f"要確認事項のバッチを出力: {bdir}（{nb} バッチ / コードで確認できる {len(items)} 件）")
+    print(f"対象外: 読むファイルが特定できない（動かす・人に聞く確認）{no_code} 件 / 回答済み {done} 件")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -287,9 +359,13 @@ def main():
     p.add_argument("--entries", type=int, default=10)
     p.add_argument("--batch-size", type=int, default=5)
     p.add_argument("--seed", type=int, default=0)
+    p = sub.add_parser("questions")
+    p.add_argument("--work", required=True)
+    p.add_argument("--batch-size", type=int, default=8)
+    p.add_argument("--redo", action="store_true", help="回答済みの要確認事項も対象にする")
     a = ap.parse_args()
     wp = work_paths(a.work)
-    {"digest": cmd_digest, "merge": cmd_merge, "sample": cmd_sample}[a.cmd](a, wp)
+    {"digest": cmd_digest, "merge": cmd_merge, "sample": cmd_sample, "questions": cmd_questions}[a.cmd](a, wp)
 
 
 if __name__ == "__main__":

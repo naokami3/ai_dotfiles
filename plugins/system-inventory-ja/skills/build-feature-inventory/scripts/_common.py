@@ -145,6 +145,7 @@ def work_paths(work):
         "extract_dir": os.path.join(work, "extract"),
         "verify_dir": os.path.join(work, "verify"),
         "review_dir": os.path.join(work, "review"),
+        "answers_dir": os.path.join(work, "answers"),
         "coverage": os.path.join(work, "coverage.json"),
         "features": os.path.join(work, "features.json"),
     }
@@ -167,6 +168,30 @@ def load_reviews(wp, keys):
         for r in d.get("entry_results", []):
             ents[r.get("entry_id")] = r
     return feats, ents, stale
+
+
+ANSWER_STATUS = {"resolved", "partially_resolved", "unresolved"}
+
+
+def question_id(feature_key, question):
+    """要確認事項の ID。機能（sources）と問いの文面から決まるので、merge し直しても同じ問いなら同じ ID"""
+    return "Q" + hashlib.sha1(f"{feature_key}\n{question}".encode("utf-8")).hexdigest()[:10]
+
+
+def load_answers(wp, qids):
+    """要確認事項への回答を読む。現在の features.json にある question_id を指すものだけを有効とする。
+
+    返り値: ({question_id: 回答}, 無視した古い回答の件数)
+    """
+    import glob
+    out, stale = {}, 0
+    for ap in sorted(glob.glob(os.path.join(wp["answers_dir"], "*.json"))):
+        for r in load_json(ap).get("answers", []):
+            if r.get("question_id") in qids:
+                out[r["question_id"]] = r
+            else:
+                stale += 1
+    return out, stale
 
 
 def die(msg, code=2):

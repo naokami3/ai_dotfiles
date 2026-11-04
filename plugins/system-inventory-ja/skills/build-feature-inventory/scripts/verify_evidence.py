@@ -17,6 +17,7 @@
 使い方:
     python3 verify_evidence.py --work W [--slice S1a2b3c ...]
     python3 verify_evidence.py --work W --review W/review/b1.json   # 独立検証の結果を検証
+    python3 verify_evidence.py --work W --answers W/answers/q01.json  # 要確認事項への回答を検証
 """
 import argparse
 import json
@@ -25,7 +26,8 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _common import load_json, norm_ws, read_lines, save_json, work_paths  # noqa: E402
+from _common import (ANSWER_STATUS, load_json, norm_question, norm_ws, question_id, read_lines,  # noqa: E402
+                     save_json, work_paths)
 
 CONF = {"confirmed", "inferred", "unknown"}
 KINDS = {"http_endpoint", "ui_route", "cli_command", "scheduled_job", "background_job",
@@ -244,16 +246,44 @@ def verify_review(ctx, path):
     return errors, warnings
 
 
+def verify_answers(ctx, path):
+    """要確認事項への回答を検証する。解消・一部解消・記述との矛盾には根拠の引用を必須にする"""
+    errors, warnings = [], []
+    d = load_json(path)
+    qids = set()
+    if os.path.exists(ctx.wp["features"]):
+        for dm in load_json(ctx.wp["features"])["domains"]:
+            for f in dm["features"]:
+                for q in f.get("open_questions") or []:
+                    qids.add(question_id(f["key"], norm_question(q)["question"]))
+    for k, r in enumerate(d.get("answers") or []):
+        w = f"answers[{k}]({r.get('question_id')})"
+        if r.get("question_id") not in qids:
+            errors.append(f"{w}: features.json に無い question_id（merge し直した後の古い対象ではないか）")
+        st = r.get("status")
+        if st not in ANSWER_STATUS:
+            errors.append(f"{w}: status は {sorted(ANSWER_STATUS)} のいずれか")
+        if len(str(r.get("answer") or "").strip()) < 8:
+            errors.append(f"{w}: answer が無いか短すぎる（分かったこと・分からなかった理由を書く）")
+        for j, ev in enumerate(r.get("evidence") or []):
+            check_quote(ctx, ev, f"{w}.evidence[{j}]", errors, warnings)
+        if (st in ("resolved", "partially_resolved") or r.get("contradicts_summary")) and not r.get("evidence"):
+            errors.append(f"{w}: 解消・一部解消・記述との矛盾には evidence（根拠の引用）が必要")
+    return errors, warnings
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", required=True)
     ap.add_argument("--slice", nargs="*")
-    ap.add_argument("--review")
+    g = ap.add_mutually_exclusive_group()
+    g.add_argument("--review")
+    g.add_argument("--answers")
     a = ap.parse_args()
     ctx = Ctx(a.work)
 
-    if a.review:
-        errors, warnings = verify_review(ctx, a.review)
+    if a.review or a.answers:
+        errors, warnings = verify_review(ctx, a.review) if a.review else verify_answers(ctx, a.answers)
         for w in warnings:
             print(f"警告: {w}")
         for e in errors:

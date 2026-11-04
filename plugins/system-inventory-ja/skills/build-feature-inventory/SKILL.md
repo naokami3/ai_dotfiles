@@ -63,10 +63,11 @@ allowed-tools: Read, Write, Agent, AskUserQuestion, Bash(python ${CLAUDE_SKILL_D
 | 進行・判断・グループ分け | 進行役 | 各 Phase の実行、ユーザーとの対話、grouping.json の作成 |
 | 抽出 | `inventory-extractor`（Sonnet、Read/Write のみ） | 1つの担当範囲を読み extract/<S>.json を書く |
 | 独立検証 | `inventory-verifier`（Sonnet） | 抜き取りの機能・対象外のエントリーポイントをコードと照合し review/<batch>.json を書く |
+| 要確認の解消 | `inventory-resolver`（Sonnet、Read/Grep/Glob/Write のみ） | 要確認事項を指定のコードで確かめ answers/<batch>.json を書く |
 | 列挙・分割・検証・集約・出力 | 同梱スクリプト | 決定的な処理すべて |
 
 サブエージェントが使えない環境（プラグインのエージェントが未登録）では、`general-purpose` に
-`agents/inventory-extractor.md` / `agents/inventory-verifier.md` の本文を読ませて同じ役割を与える。
+`agents/inventory-extractor.md` / `agents/inventory-verifier.md` / `agents/inventory-resolver.md` の本文を読ませて同じ役割を与える。
 
 ## 準備
 
@@ -199,7 +200,29 @@ python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W
    `should_be_feature` が出たら、同じ理由コードの対象外エントリーポイントを追加で検証する
 6. 誤り率が高い（例: 20% 超）なら、抽出の依頼文を見直してから該当する担当範囲を再抽出する
 
-## Phase 6: 出力
+## Phase 6: 要確認事項の解消
+
+抽出担当の要確認事項の多くは「この担当範囲外のため未確認」で、確認方法に別の担当範囲のファイルが挙がっている。
+それを別のエージェントに読ませて答えを出し、人が確認する件数を減らす。
+
+1. コードで確認できる要確認事項のバッチを作る（確認方法・本文に出てくるファイル名をファイル一覧と照合して、
+   読むファイルが特定できたものだけ。動かして確かめる・人に聞く確認は対象外として残る。回答済みは除く）
+   ```
+   python ${CLAUDE_SKILL_DIR}/scripts/features.py questions --work W
+   ```
+   件数をユーザーに伝える（1バッチ 8 件で、1体あたりおよそ 3〜6 万トークン）。件数が多ければ対象を絞るか確認する
+2. `W/question-batches/` のバッチごとに `inventory-resolver` を起動する。依頼文はバッチファイルのパスとスキーマのパス（`W/schema.md`）だけ
+3. 回答も自動検証する（解消・一部解消・記述との矛盾には根拠の引用が必須）
+   ```
+   python ${CLAUDE_SKILL_DIR}/scripts/verify_evidence.py --work W --answers W/answers/q01.json
+   ```
+4. 回答が機能の記述と矛盾したもの（`contradicts_summary`）は、独立検証の指摘と同じく元の担当範囲に差し戻す
+   ```
+   python ${CLAUDE_SKILL_DIR}/scripts/slice_brief.py --work W --from-review W/answers/q01.json [...]
+   ```
+   差し戻して抽出をやり直すと、要確認事項の文面が変わることがある。その場合は旧い回答は無視されるので、手順 1 からやり直す
+
+## Phase 7: 出力
 
 ```
 python ${CLAUDE_SKILL_DIR}/scripts/check_coverage.py --work W
@@ -216,7 +239,7 @@ python ${CLAUDE_SKILL_DIR}/scripts/render_inventory.py --work W [--out-dir <出�
 - 出力ファイルのパス
 - ファイル網羅率・エントリーポイントの対応率・確信度の内訳
 - 独立検証の結果（機能・対象外のエントリーポイントそれぞれの誤り件数と、直したか）。抜き取りであり全件保証ではないこと
-- 読んでいない範囲（除外・対象外の役割）と、要確認事項の件数
+- 読んでいない範囲（除外・対象外の役割）と、要確認事項の件数（コードで解消 / 一部解消 / 未解消 / 未着手。未着手は動かす・人に聞く確認）
 - 実際に使ったサブエージェント数と概算トークン
 
 ## トークンを節約する仕組み

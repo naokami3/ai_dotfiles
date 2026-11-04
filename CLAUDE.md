@@ -11,8 +11,11 @@ Claude Code のプラグイン（`plugins/`）と小さなツール（`tools/`�
   `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` とバージョン単位で固定される。
   版を据え置くと `claude plugin marketplace update` を実行しても古い内容が使われ続け、
   `/plugin` の更新一覧にも現れない
-- **更新の反映は `/plugin` から行う。** CLI の `claude plugin install` は既にインストール済みの
-  プラグインに対して何もしない。実際に動いている版はスキル起動時の「Base directory」行で確認する
+- **更新の反映は `/plugin` か `claude plugin update <plugin>@<marketplace>` で行う。** 先に
+  `claude plugin marketplace update <marketplace>` で一覧を更新する。CLI の `claude plugin install` は
+  既にインストール済みのプラグインに対して何もしない（新規インストールには使える）。
+  どの方法でも、反映されるのは Claude Code の再起動後。実際に動いている版はスキル起動時の
+  「Base directory」行で確認する
 - **skill の frontmatter の `paths` は YAML リストで書く。** カンマ区切り文字列は公式ドキュメント上
   許容されているが、2.1.220 では**無言でスキルが読み込まれない**（エラーも警告も出ない）
 - **`allowed-tools` の Bash ルールで展開されるのは `${CLAUDE_SKILL_DIR}` と `${CLAUDE_PROJECT_DIR}` だけ。**

@@ -17,6 +17,8 @@
 | `grouping.json` | 進行役 | ドメイン・機能のグループ分け（下記） |
 | `features.json` | `features.py merge` | **元データ**。機能一覧のすべての出力はここから作る |
 | `review-batches/bNN.json` | `features.py sample` | 独立検証の対象 |
+| `question-batches/qNN.json` | `features.py questions` | 回答担当に渡す要確認事項 |
+| `answers/qNN.json` | 回答担当エージェント | 要確認事項への回答（下記） |
 | `review/bNN.json` | 検証担当エージェント | 独立検証の結果（下記） |
 | `coverage.json` | `check_coverage.py` | 網羅率 |
 | `feature-inventory.{xlsx,html,md}` | `render_inventory.py` | 人間向けの成果物 |
@@ -171,3 +173,30 @@ items は `type: feature`（機能）と `type: unmapped_entry`（対象外に�
 - `results[].verdict`: `correct` / `partially_correct` / `incorrect` / `unverifiable`。誤りの指摘には `evidence` が必須
 - `entry_results[].verdict`: `correct`（対象外で正しい）/ `should_be_feature`（業務機能なので対応付けるべき）/ `unverifiable`
 - `feature_key` は機能の sources から決まる。merge し直して機能の構成が変わると、古い結果は自動的に無視される
+
+## question-batches/qNN.json（`features.py questions` が書く）と answers/qNN.json（回答担当が書く）
+
+バッチには `repo`・`output`・`items` が入る。item は `question_id`・`feature_key`・`feature_id`・`feature_name`・
+`feature_summary`・`question`・`how_to_check`・`files`（読むべきファイル）。
+
+```json
+{
+  "answers": [
+    {
+      "question_id": "Q3f9a1c0b2e",
+      "status": "resolved",
+      "answer": "loginMutation は POST /login/access-token を呼び、受け取ったトークンを localStorage の access_token に保存する。",
+      "evidence": [{"path": "frontend/src/hooks/useAuth.ts", "line": 52, "quote": "localStorage.setItem(\"access_token\""}],
+      "contradicts_summary": false
+    }
+  ]
+}
+```
+
+| 項目 | 規則 |
+|---|---|
+| `question_id` | バッチの値をそのまま写す。機能の構成か問いの文面が変わると、古い回答は自動的に無視される |
+| `status` | `resolved`（確定）/ `partially_resolved`（一部確定）/ `unresolved`（読んでも分からない） |
+| `answer` | 分かったこと、または何を読んで何が分からなかったか。8 文字以上 |
+| `evidence` | `resolved` / `partially_resolved` では必須。その行に実際に書かれている文字列を写す |
+| `contradicts_summary` | 答えが機能の要約と食い違うとき `true`。根拠必須。元の担当範囲に差し戻す |
